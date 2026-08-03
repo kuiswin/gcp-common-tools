@@ -2,7 +2,7 @@
 set -eu
 
 # -----------------------------------------------------------------------------
-# GCP 全サービス一括クリーンアップ ＆ 休眠（課金解除）対話的チェック付きスクリプト
+# GCP 全サービス一括クリーンアップ ＆ 休眠（課金解除）データ駆動型スクリプト
 # -----------------------------------------------------------------------------
 
 PROJECT_ID="${PROJECT_ID:-$(gcloud config get-value project </dev/null 2>/dev/null || echo "")}"
@@ -20,34 +20,80 @@ echo "========================================================"
 echo ""
 
 # -----------------------------------------------------------------------------
+# 1. 走査・お掃除対象サービス一覧の定義 (データリスト)
+# -----------------------------------------------------------------------------
+RESOURCE_TARGETS=(
+    "Cloud Run (サービス / ジョブ)"
+    "Pub/Sub (トピック / サブスクリプション)"
+    "Cloud Storage (GCS バケット)"
+    "Cloud Spanner (データベースインスタンス)"
+    "AlloyDB (データベースクラスター)"
+    "Artifact Registry (コンテナリポジトリ)"
+    "Vertex AI (Gemini / 機械学習常駐エンドポイント)"
+    "IAM (専用サービスアカウント)"
+)
+
+# -----------------------------------------------------------------------------
+# 2. 汎用チェック ＆ クリーンアップ関数 (モジュール化)
+# -----------------------------------------------------------------------------
+cleanup_resource() {
+    local idx="$1"
+    local total="$2"
+    local title="$3"
+    local list_cmd="$4"
+    local del_cmd_prefix="$5"
+    local del_cmd_suffix="${6:-}"
+    local label_name="$7"
+
+    echo "🔎 【${idx}/${total}】${title} のチェックを行っています..."
+    local items
+    items="$(eval "${list_cmd}" </dev/null 2>/dev/null || echo "")"
+
+    if [ -n "${items}" ]; then
+        echo "⚠️ 以下の残存リソースを検出しました:"
+        for item in ${items}; do
+            echo "   👉 ${label_name}: ${item}"
+        done
+        echo "🗑️ 削除処理を実行します..."
+        for item in ${items}; do
+            eval "${del_cmd_prefix} \"${item}\" ${del_cmd_suffix}" </dev/null 2>/dev/null || true
+        done
+        echo "🔄 削除後の再確認を行っています..."
+        local check_items
+        check_items="$(eval "${list_cmd}" </dev/null 2>/dev/null || echo "")"
+        if [ -z "${check_items}" ]; then
+            echo "✅ 削除完了を確認しました！（${label_name}: 0件）"
+        fi
+    else
+        echo "ℹ️ ${label_name} は検出されませんでした（すでにクリーンです）"
+    fi
+    echo ""
+}
+
+# -----------------------------------------------------------------------------
 # STEP 1: 個別サービス・リソースの存在チェック ＆ 削除 ＆ 再確認
 # -----------------------------------------------------------------------------
 echo "--------------------------------------------------------"
 echo "🔍 1. 個別サービス・リソースのチェック ＆ 削除"
 echo "--------------------------------------------------------"
-
-# 1-1. Cloud Run
-echo "🔎 【1/8】Cloud Run サービスのチェックを行っています..."
-SERVICES="$(gcloud run services list --project="${PROJECT_ID}" --format="value(metadata.name)" </dev/null 2>/dev/null || echo "")"
-if [ -n "${SERVICES}" ]; then
-    echo "⚠️ 以下の残存サービスを検出しました:"
-    for s in ${SERVICES}; do echo "   👉 Cloud Run: ${s}"; done
-    echo "🗑️ 削除処理を実行します..."
-    for s in ${SERVICES}; do
-        gcloud run services delete "${s}" --project="${PROJECT_ID}" --quiet --region=us-central1 </dev/null 2>/dev/null || true
-    done
-    echo "🔄 削除後の再確認を行っています..."
-    CHECK_SERVICES="$(gcloud run services list --project="${PROJECT_ID}" --format="value(metadata.name)" </dev/null 2>/dev/null || echo "")"
-    if [ -z "${CHECK_SERVICES}" ]; then
-        echo "✅ 削除完了を確認しました！（Cloud Run サービス: 0件）"
-    fi
-else
-    echo "ℹ️ Cloud Run サービスは検出されませんでした（すでにクリーンです）"
-fi
+echo "📌 本プログラムの走査・お掃除対象サービス一覧 (${#RESOURCE_TARGETS[@]}項目):"
+for i in "${!RESOURCE_TARGETS[@]}"; do
+    echo "   $((i+1)). ${RESOURCE_TARGETS[$i]}"
+done
+echo "--------------------------------------------------------"
 echo ""
 
+TOTAL=${#RESOURCE_TARGETS[@]}
+
+# 1-1. Cloud Run
+cleanup_resource "1" "${TOTAL}" "Cloud Run サービス" \
+    "gcloud run services list --project=\"${PROJECT_ID}\" --format=\"value(metadata.name)\"" \
+    "gcloud run services delete" \
+    "--project=\"${PROJECT_ID}\" --quiet --region=us-central1" \
+    "Cloud Run サービス"
+
 # 1-2. Pub/Sub
-echo "🔎 【2/8】Pub/Sub (トピック・サブスクリプション) のチェックを行っています..."
+echo "🔎 【2/${TOTAL}】Pub/Sub (トピック・サブスクリプション) のチェックを行っています..."
 SUBS="$(gcloud pubsub subscriptions list --project="${PROJECT_ID}" --format="value(name)" </dev/null 2>/dev/null || echo "")"
 TOPICS="$(gcloud pubsub topics list --project="${PROJECT_ID}" --format="value(name)" </dev/null 2>/dev/null || echo "")"
 if [ -n "${SUBS}" ] || [ -n "${TOPICS}" ]; then
@@ -69,97 +115,42 @@ fi
 echo ""
 
 # 1-3. Cloud Storage (GCS)
-echo "🔎 【3/8】Cloud Storage (GCS バケット) のチェックを行っています..."
-BUCKETS="$(gcloud storage ls --project="${PROJECT_ID}" </dev/null 2>/dev/null || echo "")"
-if [ -n "${BUCKETS}" ]; then
-    echo "⚠️ 以下の残存バケットを検出しました:"
-    for b in ${BUCKETS}; do echo "   👉 Bucket: ${b}"; done
-    echo "🗑️ 削除処理を実行します..."
-    for b in ${BUCKETS}; do gcloud storage rm -r "${b}" --quiet </dev/null 2>/dev/null || true; done
-    echo "🔄 削除後の再確認を行っています..."
-    CHECK_BUCKETS="$(gcloud storage ls --project="${PROJECT_ID}" </dev/null 2>/dev/null || echo "")"
-    if [ -z "${CHECK_BUCKETS}" ]; then
-        echo "✅ 削除完了を確認しました！（GCS バケット: 0件）"
-    fi
-else
-    echo "ℹ️ GCS バケットは検出されませんでした（すでにクリーンです）"
-fi
-echo ""
+cleanup_resource "3" "${TOTAL}" "Cloud Storage (GCS バケット)" \
+    "gcloud storage ls --project=\"${PROJECT_ID}\"" \
+    "gcloud storage rm -r" \
+    "--quiet" \
+    "GCS バケット"
 
 # 1-4. Cloud Spanner
-echo "🔎 【4/8】Cloud Spanner インスタンスのチェックを行っています..."
-SPANNER="$(gcloud spanner instances list --project="${PROJECT_ID}" --format="value(name)" </dev/null 2>/dev/null || echo "")"
-if [ -n "${SPANNER}" ]; then
-    echo "⚠️ 以下の残存インスタンスを検出しました:"
-    for sp in ${SPANNER}; do echo "   👉 Spanner Instance: ${sp}"; done
-    echo "🗑️ 削除処理を実行します..."
-    for sp in ${SPANNER}; do gcloud spanner instances delete "${sp}" --project="${PROJECT_ID}" --quiet </dev/null 2>/dev/null || true; done
-    echo "🔄 削除後の再確認を行っています..."
-    CHECK_SPANNER="$(gcloud spanner instances list --project="${PROJECT_ID}" --format="value(name)" </dev/null 2>/dev/null || echo "")"
-    if [ -z "${CHECK_SPANNER}" ]; then
-        echo "✅ 削除完了を確認しました！（Spanner インスタンス: 0件）"
-    fi
-else
-    echo "ℹ️ Spanner インスタンスは検出されませんでした（すでにクリーンです）"
-fi
-echo ""
+cleanup_resource "4" "${TOTAL}" "Cloud Spanner インスタンス" \
+    "gcloud spanner instances list --project=\"${PROJECT_ID}\" --format=\"value(name)\"" \
+    "gcloud spanner instances delete" \
+    "--project=\"${PROJECT_ID}\" --quiet" \
+    "Spanner インスタンス"
 
 # 1-5. AlloyDB
-echo "🔎 【5/8】AlloyDB クラスターのチェックを行っています..."
-ALLOY="$(gcloud alloydb clusters list --project="${PROJECT_ID}" --format="value(name)" </dev/null 2>/dev/null || echo "")"
-if [ -n "${ALLOY}" ]; then
-    echo "⚠️ 以下の残存クラスターを検出しました:"
-    for ac in ${ALLOY}; do echo "   👉 AlloyDB Cluster: ${ac}"; done
-    echo "🗑️ 削除処理を実行します..."
-    for ac in ${ALLOY}; do gcloud alloydb clusters delete "${ac}" --project="${PROJECT_ID}" --region=us-central1 --quiet </dev/null 2>/dev/null || true; done
-    echo "🔄 削除後の再確認を行っています..."
-    CHECK_ALLOY="$(gcloud alloydb clusters list --project="${PROJECT_ID}" --format="value(name)" </dev/null 2>/dev/null || echo "")"
-    if [ -z "${CHECK_ALLOY}" ]; then
-        echo "✅ 削除完了を確認しました！（AlloyDB クラスター: 0件）"
-    fi
-else
-    echo "ℹ️ AlloyDB クラスターは検出されませんでした（すでにクリーンです）"
-fi
-echo ""
+cleanup_resource "5" "${TOTAL}" "AlloyDB クラスター" \
+    "gcloud alloydb clusters list --project=\"${PROJECT_ID}\" --format=\"value(name)\"" \
+    "gcloud alloydb clusters delete" \
+    "--project=\"${PROJECT_ID}\" --region=us-central1 --quiet" \
+    "AlloyDB クラスター"
 
 # 1-6. Artifact Registry
-echo "🔎 【6/8】Artifact Registry リポジトリのチェックを行っています..."
-AR_REPOS="$(gcloud artifacts repositories list --project="${PROJECT_ID}" --format="value(name)" </dev/null 2>/dev/null || echo "")"
-if [ -n "${AR_REPOS}" ]; then
-    echo "⚠️ 以下の残存リポジトリを検出しました:"
-    for repo in ${AR_REPOS}; do echo "   👉 Repository: ${repo}"; done
-    echo "🗑️ 削除処理を実行します..."
-    for repo in ${AR_REPOS}; do gcloud artifacts repositories delete "${repo}" --project="${PROJECT_ID}" --location=us-central1 --quiet </dev/null 2>/dev/null || true; done
-    echo "🔄 削除後の再確認を行っています..."
-    CHECK_AR="$(gcloud artifacts repositories list --project="${PROJECT_ID}" --format="value(name)" </dev/null 2>/dev/null || echo "")"
-    if [ -z "${CHECK_AR}" ]; then
-        echo "✅ 削除完了を確認しました！（Artifact Registry: 0件）"
-    fi
-else
-    echo "ℹ️ Artifact Registry リポジトリは検出されませんでした（すでにクリーンです）"
-fi
-echo ""
+cleanup_resource "6" "${TOTAL}" "Artifact Registry リポジトリ" \
+    "gcloud artifacts repositories list --project=\"${PROJECT_ID}\" --format=\"value(name)\"" \
+    "gcloud artifacts repositories delete" \
+    "--project=\"${PROJECT_ID}\" --location=us-central1 --quiet" \
+    "Artifact Registry リポジトリ"
 
-# 1-7. Vertex AI Endpoints (Gemini / ML Endpoints)
-echo "🔎 【7/8】Vertex AI (Gemini / 機械学習) 常駐エンドポイントのチェックを行っています..."
-AI_ENDPOINTS="$(gcloud ai endpoints list --project="${PROJECT_ID}" --region=us-central1 --format="value(name)" </dev/null 2>/dev/null || echo "")"
-if [ -n "${AI_ENDPOINTS}" ]; then
-    echo "⚠️ 以下の残存Vertex AIエンドポイントを検出しました:"
-    for ep in ${AI_ENDPOINTS}; do echo "   👉 Vertex AI Endpoint: ${ep}"; done
-    echo "🗑️ 削除処理を実行します..."
-    for ep in ${AI_ENDPOINTS}; do gcloud ai endpoints delete "${ep}" --project="${PROJECT_ID}" --region=us-central1 --quiet </dev/null 2>/dev/null || true; done
-    echo "🔄 削除後の再確認を行っています..."
-    CHECK_AI="$(gcloud ai endpoints list --project="${PROJECT_ID}" --region=us-central1 --format="value(name)" </dev/null 2>/dev/null || echo "")"
-    if [ -z "${CHECK_AI}" ]; then
-        echo "✅ 削除完了を確認しました！（Vertex AI エンドポイント: 0件）"
-    fi
-else
-    echo "ℹ️ Vertex AI エンドポイントは検出されませんでした（すでにクリーンです）"
-fi
-echo ""
+# 1-7. Vertex AI Endpoints
+cleanup_resource "7" "${TOTAL}" "Vertex AI 常駐エンドポイント" \
+    "gcloud ai endpoints list --project=\"${PROJECT_ID}\" --region=us-central1 --format=\"value(name)\"" \
+    "gcloud ai endpoints delete" \
+    "--project=\"${PROJECT_ID}\" --region=us-central1 --quiet" \
+    "Vertex AI エンドポイント"
 
 # 1-8. IAM Service Accounts
-echo "🔎 【8/8】IAM 専用サービスアカウントのチェックを行っています..."
+echo "🔎 【8/${TOTAL}】IAM 専用サービスアカウントのチェックを行っています..."
 SAS="$(gcloud iam service-accounts list --project="${PROJECT_ID}" --format="value(email)" </dev/null 2>/dev/null || echo "")"
 TARGET_SAS=""
 if [ -n "${SAS}" ]; then
@@ -203,7 +194,7 @@ if [ -n "${ENABLED_APIS}" ]; then
 fi
 
 if [ -n "${TARGET_APIS}" ]; then
-    echo "⚠️ 以下の不要API（Gemini/Vertex AI/Translation等を含む無効化対象）が有効になっています:"
+    echo "⚠️ 以下の不要API（無効化対象）が有効になっています:"
     for api in ${TARGET_APIS}; do echo "   👉 無効化対象API: ${api}"; done
     echo "🗑️ 不要APIの無効化処理を実行します..."
     echo "${TARGET_APIS}" | xargs -r -I {} gcloud services disable {} --project="${PROJECT_ID}" --force --quiet </dev/null 2>/dev/null || true
