@@ -164,11 +164,18 @@ fi
 echo ""
 
 # -----------------------------------------------------------------------------
-# STEP 2: APIサービスのチェック ＆ 無効化 ＆ 残存確認
+# STEP 2: APIサービスのチェック ＆ 無効化 ＆ 切り分け結果の確認
 # -----------------------------------------------------------------------------
 echo "--------------------------------------------------------"
 echo "🔍 2. 有効なAPIサービスのチェック ＆ 無効化"
 echo "--------------------------------------------------------"
+
+echo "📌 【定義】プロジェクト維持のため「残して良い基本API (ホワイトリスト)」:"
+echo "   1. cloudbilling.googleapis.com (Cloud Billing API)"
+echo "   2. cloudresourcemanager.googleapis.com (Cloud Resource Manager API)"
+echo "   3. serviceusage.googleapis.com (Service Usage API)"
+echo ""
+
 echo "🔎 現在有効化されているAPI一覧をチェックしています..."
 ENABLED_APIS="$(gcloud services list --enabled --project="${PROJECT_ID}" --format="value(config.name)" </dev/null 2>/dev/null || echo "")"
 
@@ -178,19 +185,33 @@ if [ -n "${ENABLED_APIS}" ]; then
 fi
 
 if [ -n "${TARGET_APIS}" ]; then
-    echo "⚠️ 以下の不要APIが有効化されています:"
-    for api in ${TARGET_APIS}; do echo "   👉 API: ${api}"; done
+    echo "⚠️ 以下の不要API（無効化対象）が有効になっています:"
+    for api in ${TARGET_APIS}; do echo "   👉 無効化対象API: ${api}"; done
     echo "🗑️ 不要APIの無効化処理を実行します..."
     echo "${TARGET_APIS}" | xargs -r -I {} gcloud services disable {} --project="${PROJECT_ID}" --force --quiet </dev/null 2>/dev/null || true
-    echo "🔄 API無効化処理の完了を待っています (3秒)..."
+    echo "🔄 API無効化処理の反映を待っています (3秒)..."
     sleep 3
-    echo "🔄 一覧を再取得します..."
 else
     echo "ℹ️ 不要なAPIは検出されませんでした（すでに最小化されています）"
 fi
 
 echo ""
-echo "📌 現在有効なAPI一覧（これらはプロジェクト維持に必要な基本機能です）:"
+echo "🔎 【切り分け確認】無効化後の有効API一覧を取得中..."
+FINAL_APIS="$(gcloud services list --enabled --project="${PROJECT_ID}" --format="value(config.name)" </dev/null 2>/dev/null || echo "")"
+FINAL_TARGETS=""
+if [ -n "${FINAL_APIS}" ]; then
+    FINAL_TARGETS="$(echo "${FINAL_APIS}" | grep -v -E "cloudresourcemanager.googleapis.com|serviceusage.googleapis.com|cloudbilling.googleapis.com" || true)"
+fi
+
+if [ -z "${FINAL_TARGETS}" ]; then
+    echo "✅ 【正常】不要APIはすべて正常に停止されました！基本3APIのみが維持されています。"
+else
+    echo "⚠️ 【確認】以下のAPIがまだ残っています（依存関係や非同期処理のため）:"
+    for api in ${FINAL_TARGETS}; do echo "   👉 残存API: ${api}"; done
+fi
+
+echo ""
+echo "📌 最終的にプロジェクトに残っているAPI一覧:"
 gcloud services list --enabled --project="${PROJECT_ID}" --format="table(config.name, title)" </dev/null 2>/dev/null || echo "基本API一覧の取得完了"
 echo ""
 
