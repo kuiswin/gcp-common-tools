@@ -173,7 +173,7 @@ fi
 echo ""
 
 # -----------------------------------------------------------------------------
-# STEP 2: APIサービスのチェック ＆ 無効化 ＆ 切り分け結果の確認
+# STEP 2: APIサービスのチェック ＆ 無効化 ＆ 切り分け結果の判定
 # -----------------------------------------------------------------------------
 echo "--------------------------------------------------------"
 echo "🔍 2. 有効なAPIサービスのチェック ＆ 無効化"
@@ -197,7 +197,6 @@ if [ -n "${TARGET_APIS}" ]; then
     echo "⚠️ 以下の不要API（無効化対象）が有効になっています:"
     for api in ${TARGET_APIS}; do echo "   👉 無効化対象API: ${api}"; done
     echo "🗑️ 不要APIの無効化処理を実行します..."
-    # TARGET_APIS を一括で gcloud services disable に渡す (xargsの/dev/null衝突回避)
     gcloud services disable ${TARGET_APIS} --project="${PROJECT_ID}" --force --quiet </dev/null 2>/dev/null || true
     echo "🔄 API無効化処理の反映を待っています (3秒)..."
     sleep 3
@@ -206,22 +205,33 @@ else
 fi
 
 echo ""
-echo "🔎 【切り分け確認】無効化後の有効API一覧を取得中..."
+echo "🔎 【切り分け判定】無効化後の残存APIチェック中..."
 FINAL_APIS="$(gcloud services list --enabled --project="${PROJECT_ID}" --format="value(config.name)" </dev/null 2>/dev/null || echo "")"
 FINAL_TARGETS=""
 if [ -n "${FINAL_APIS}" ]; then
     FINAL_TARGETS="$(echo "${FINAL_APIS}" | grep -v -E "cloudresourcemanager.googleapis.com|serviceusage.googleapis.com|cloudbilling.googleapis.com" || true)"
 fi
 
-if [ -z "${FINAL_TARGETS}" ]; then
-    echo "✅ 【正常】不要APIはすべて正常に停止されました！基本3APIのみが維持されています。"
-else
-    echo "⚠️ 【確認】以下のAPIがまだ残っています（依存関係や非同期処理のため）:"
-    for api in ${FINAL_TARGETS}; do echo "   👉 残存API: ${api}"; done
+TOTAL_FINAL_COUNT=0
+if [ -n "${FINAL_APIS}" ]; then
+    TOTAL_FINAL_COUNT=$(echo "${FINAL_APIS}" | wc -w)
 fi
 
-echo ""
-echo "📌 最終的にプロジェクトに残っているAPI一覧:"
+if [ -z "${FINAL_TARGETS}" ]; then
+    echo "✅ 【完璧】不要APIはすべて正常に停止されました！基本3APIのみが維持されています（余分API: 0件）。"
+    echo ""
+    echo "📌 最終的にプロジェクトに残っているAPI一覧 (${TOTAL_FINAL_COUNT}件 / 想定通り3件):"
+else
+    EXTRA_COUNT=$(echo "${FINAL_TARGETS}" | wc -w)
+    echo "🚨 【要確認】基本3API以外に、以下の未停止API（${EXTRA_COUNT}件）が残存しています！"
+    for api in ${FINAL_TARGETS}; do
+        echo "   ❌ 停止未完了API: ${api}"
+    done
+    echo "   (※ 請求先アカウント未紐付け時や他リソースとの依存関係で残る場合があります)"
+    echo ""
+    echo "⚠️ 最終的にプロジェクトに残っているAPI一覧 (${TOTAL_FINAL_COUNT}件 / 🚨注意: 基本3件を超えています):"
+fi
+
 gcloud services list --enabled --project="${PROJECT_ID}" --format="table(config.name, title)" </dev/null 2>/dev/null || echo "基本API一覧の取得完了"
 echo ""
 
