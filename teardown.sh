@@ -28,7 +28,9 @@ RESOURCE_TARGETS=(
     "Cloud Storage (GCS バケット)"
     "Cloud Spanner (データベースインスタンス)"
     "AlloyDB (データベースクラスター)"
+    "Cloud Bigtable (NoSQLデータベースインスタンス)"
     "Artifact Registry (コンテナリポジトリ)"
+    "Secret Manager (シークレット・機密情報)"
     "Vertex AI (Gemini / 機械学習常駐エンドポイント)"
     "IAM (専用サービスアカウント)"
 )
@@ -135,22 +137,36 @@ cleanup_resource "5" "${TOTAL}" "AlloyDB クラスター" \
     "--project=\"${PROJECT_ID}\" --region=us-central1 --quiet" \
     "AlloyDB クラスター"
 
-# 1-6. Artifact Registry
-cleanup_resource "6" "${TOTAL}" "Artifact Registry リポジトリ" \
+# 1-6. Cloud Bigtable
+cleanup_resource "6" "${TOTAL}" "Cloud Bigtable インスタンス" \
+    "gcloud bigtable instances list --project=\"${PROJECT_ID}\" --format=\"value(name)\"" \
+    "gcloud bigtable instances delete" \
+    "--project=\"${PROJECT_ID}\" --quiet" \
+    "Bigtable インスタンス"
+
+# 1-7. Artifact Registry
+cleanup_resource "7" "${TOTAL}" "Artifact Registry リポジトリ" \
     "gcloud artifacts repositories list --project=\"${PROJECT_ID}\" --format=\"value(name)\"" \
     "gcloud artifacts repositories delete" \
     "--project=\"${PROJECT_ID}\" --location=us-central1 --quiet" \
     "Artifact Registry リポジトリ"
 
-# 1-7. Vertex AI Endpoints
-cleanup_resource "7" "${TOTAL}" "Vertex AI 常駐エンドポイント" \
+# 1-8. Secret Manager
+cleanup_resource "8" "${TOTAL}" "Secret Manager シークレット" \
+    "gcloud secrets list --project=\"${PROJECT_ID}\" --format=\"value(name)\"" \
+    "gcloud secrets delete" \
+    "--project=\"${PROJECT_ID}\" --quiet" \
+    "Secret Manager シークレット"
+
+# 1-9. Vertex AI Endpoints
+cleanup_resource "9" "${TOTAL}" "Vertex AI 常駐エンドポイント" \
     "gcloud ai endpoints list --project=\"${PROJECT_ID}\" --region=us-central1 --format=\"value(name)\"" \
     "gcloud ai endpoints delete" \
     "--project=\"${PROJECT_ID}\" --region=us-central1 --quiet" \
     "Vertex AI エンドポイント"
 
-# 1-8. IAM Service Accounts
-echo "🔎 【8/${TOTAL}】IAM 専用サービスアカウントのチェックを行っています..."
+# 1-10. IAM Service Accounts
+echo "🔎 【10/${TOTAL}】IAM 専用サービスアカウントのチェックを行っています..."
 SAS="$(gcloud iam service-accounts list --project="${PROJECT_ID}" --format="value(email)" </dev/null 2>/dev/null || echo "")"
 TARGET_SAS=""
 if [ -n "${SAS}" ]; then
