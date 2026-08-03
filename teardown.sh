@@ -180,9 +180,9 @@ echo "🔍 2. 有効なAPIサービスのチェック ＆ 無効化"
 echo "--------------------------------------------------------"
 
 echo "📌 【定義】プロジェクト維持のため「残して良い基本API (ホワイトリスト)」:"
-echo "   1. cloudbilling.googleapis.com (Cloud Billing API)"
-echo "   2. cloudresourcemanager.googleapis.com (Cloud Resource Manager API)"
-echo "   3. serviceusage.googleapis.com (Service Usage API)"
+echo "   🟢 cloudbilling.googleapis.com (Cloud Billing API)"
+echo "   🟢 cloudresourcemanager.googleapis.com (Cloud Resource Manager API)"
+echo "   🟢 serviceusage.googleapis.com (Service Usage API)"
 echo ""
 
 echo "🔎 現在有効化されているAPI一覧をチェックしています..."
@@ -225,14 +225,32 @@ else
     EXTRA_COUNT=$(echo "${FINAL_TARGETS}" | wc -w)
     echo "🚨 【要確認】基本3API以外に、以下の未停止API（${EXTRA_COUNT}件）が残存しています！"
     for api in ${FINAL_TARGETS}; do
-        echo "   ❌ 停止未完了API: ${api}"
+        echo "   🔴 停止未完了API: ${api}"
     done
     echo "   (※ 請求先アカウント未紐付け時や他リソースとの依存関係で残る場合があります)"
     echo ""
     echo "⚠️ 最終的にプロジェクトに残っているAPI一覧 (${TOTAL_FINAL_COUNT}件 / 🚨注意: 基本3件を超えています):"
 fi
 
-gcloud services list --enabled --project="${PROJECT_ID}" --format="table(config.name, title)" </dev/null 2>/dev/null || echo "基本API一覧の取得完了"
+# 美しいアイコン表示フォーマット出力
+if [ -n "${FINAL_APIS}" ]; then
+    for api in ${FINAL_APIS}; do
+        case "${api}" in
+            "cloudbilling.googleapis.com")
+                echo "   🟢 [維持OK] ${api} (Cloud Billing API)"
+                ;;
+            "cloudresourcemanager.googleapis.com")
+                echo "   🟢 [維持OK] ${api} (Cloud Resource Manager API)"
+                ;;
+            "serviceusage.googleapis.com")
+                echo "   🟢 [維持OK] ${api} (Service Usage API)"
+                ;;
+            *)
+                echo "   🔴 [要確認] ${api}"
+                ;;
+        esac
+    done
+fi
 echo ""
 
 # -----------------------------------------------------------------------------
