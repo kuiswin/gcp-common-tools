@@ -1,5 +1,5 @@
 #!/bin/bash
-set -euo pipefail
+set -eu
 
 # -----------------------------------------------------------------------------
 # GCP 共通プロビジョニング ＆ 事前チェック スクリプト
@@ -61,7 +61,9 @@ echo ""
 echo "----------------------------------------"
 echo "🔍 2. 課金状態の確認（Link前）"
 echo "----------------------------------------"
-IS_ENABLED=$(gcloud beta billing projects describe "${PROJECT_ID}" --format="value(billingEnabled)" 2>/dev/null || echo "false")
+RAW_IS_ENABLED=$(gcloud beta billing projects describe "${PROJECT_ID}" --format="value(billingEnabled)" 2>/dev/null || echo "false")
+IS_ENABLED=$(echo "${RAW_IS_ENABLED}" | tr '[:upper:]' '[:lower:]')
+
 if [ "${IS_ENABLED}" = "true" ]; then
     echo "ℹ️ 課金状態: リンク済み（True）"
 else
@@ -96,7 +98,9 @@ echo ""
 echo "----------------------------------------"
 echo "🔍 6. 課金状態の確認（Link後）"
 echo "----------------------------------------"
-IS_ENABLED_AFTER=$(gcloud beta billing projects describe "${PROJECT_ID}" --format="value(billingEnabled)" 2>/dev/null || echo "false")
+RAW_AFTER=$(gcloud beta billing projects describe "${PROJECT_ID}" --format="value(billingEnabled)" 2>/dev/null || echo "false")
+IS_ENABLED_AFTER=$(echo "${RAW_AFTER}" | tr '[:upper:]' '[:lower:]')
+
 if [ "${IS_ENABLED_AFTER}" = "true" ]; then
     echo "✅ 課金状態: リンク完了（True） - 【成功】課金アカウントが正しく有効化されました！"
 else
