@@ -15,7 +15,7 @@ Google Cloud ハンズオン・連載記事（170〜174シリーズ）全共通�
 
 ```bash
 # 基本使用法（Gitワンライナー実行）
-curl -sSL "https://raw.githubusercontent.com/kuiswin/gcp-common-tools/main/pre_flight.sh?$(date +%s)" | bash
+curl -sSL -H 'Cache-Control: no-cache, no-store' https://raw.githubusercontent.com/kuiswin/gcp-common-tools/main/pre_flight.sh | bash
 ```
 
 ```bash
@@ -24,7 +24,7 @@ export KEYWORD="abcde"
 export ARTICLE_ID="171"
 export PROJECT_ID="ferrous-iridium-286000" # 手動固定したい場合のみ指定
 
-curl -sSL "https://raw.githubusercontent.com/kuiswin/gcp-common-tools/main/pre_flight.sh?$(date +%s)" | bash
+curl -sSL -H 'Cache-Control: no-cache, no-store' https://raw.githubusercontent.com/kuiswin/gcp-common-tools/main/pre_flight.sh | bash
 ```
 
 ---
@@ -37,7 +37,7 @@ curl -sSL "https://raw.githubusercontent.com/kuiswin/gcp-common-tools/main/pre_f
 
 ```bash
 # 基本使用法（Gitワンライナー実行）
-curl -sSL "https://raw.githubusercontent.com/kuiswin/gcp-common-tools/main/teardown.sh?$(date +%s)" | bash
+curl -sSL -H 'Cache-Control: no-cache, no-store' https://raw.githubusercontent.com/kuiswin/gcp-common-tools/main/teardown.sh | bash
 ```
 
 ---
