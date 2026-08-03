@@ -197,7 +197,8 @@ if [ -n "${TARGET_APIS}" ]; then
     echo "⚠️ 以下の不要API（無効化対象）が有効になっています:"
     for api in ${TARGET_APIS}; do echo "   👉 無効化対象API: ${api}"; done
     echo "🗑️ 不要APIの無効化処理を実行します..."
-    echo "${TARGET_APIS}" | xargs -r -I {} gcloud services disable {} --project="${PROJECT_ID}" --force --quiet </dev/null 2>/dev/null || true
+    # TARGET_APIS を一括で gcloud services disable に渡す (xargsの/dev/null衝突回避)
+    gcloud services disable ${TARGET_APIS} --project="${PROJECT_ID}" --force --quiet </dev/null 2>/dev/null || true
     echo "🔄 API無効化処理の反映を待っています (3秒)..."
     sleep 3
 else
