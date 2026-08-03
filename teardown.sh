@@ -195,10 +195,14 @@ echo "--------------------------------------------------------"
 echo "🔍 2. 有効なAPIサービスのチェック ＆ 無効化"
 echo "--------------------------------------------------------"
 
+# 基本APIホワイトリストパターン (grep -E 用)
+WHITELIST_REGEX="cloudresourcemanager.googleapis.com|serviceusage.googleapis.com|cloudbilling.googleapis.com|cloudaicompanion.googleapis.com"
+
 echo "📌 【定義】プロジェクト維持のため「残して良い基本API (ホワイトリスト)」:"
 echo "   🟢 cloudbilling.googleapis.com (Cloud Billing API)"
 echo "   🟢 cloudresourcemanager.googleapis.com (Cloud Resource Manager API)"
 echo "   🟢 serviceusage.googleapis.com (Service Usage API)"
+echo "   🟢 cloudaicompanion.googleapis.com (Gemini for Google Cloud API)"
 echo ""
 
 echo "🔎 現在有効化されているAPI一覧をチェックしています..."
@@ -206,7 +210,7 @@ ENABLED_APIS="$(gcloud services list --enabled --project="${PROJECT_ID}" --forma
 
 TARGET_APIS=""
 if [ -n "${ENABLED_APIS}" ]; then
-    TARGET_APIS="$(echo "${ENABLED_APIS}" | grep -v -E "cloudresourcemanager.googleapis.com|serviceusage.googleapis.com|cloudbilling.googleapis.com" || true)"
+    TARGET_APIS="$(echo "${ENABLED_APIS}" | grep -v -E "${WHITELIST_REGEX}" || true)"
 fi
 
 if [ -n "${TARGET_APIS}" ]; then
@@ -225,7 +229,7 @@ echo "🔎 【切り分け判定】無効化後の残存APIチェック中..."
 FINAL_APIS="$(gcloud services list --enabled --project="${PROJECT_ID}" --format="value(config.name)" </dev/null 2>/dev/null || echo "")"
 FINAL_TARGETS=""
 if [ -n "${FINAL_APIS}" ]; then
-    FINAL_TARGETS="$(echo "${FINAL_APIS}" | grep -v -E "cloudresourcemanager.googleapis.com|serviceusage.googleapis.com|cloudbilling.googleapis.com" || true)"
+    FINAL_TARGETS="$(echo "${FINAL_APIS}" | grep -v -E "${WHITELIST_REGEX}" || true)"
 fi
 
 TOTAL_FINAL_COUNT=0
@@ -234,18 +238,18 @@ if [ -n "${FINAL_APIS}" ]; then
 fi
 
 if [ -z "${FINAL_TARGETS}" ]; then
-    echo "✅ 【完璧】不要APIはすべて正常に停止されました！基本3APIのみが維持されています（余分API: 0件）。"
+    echo "✅ 【完璧】不要APIはすべて正常に停止されました！基本APIのみが維持されています（余分API: 0件）。"
     echo ""
-    echo "📌 最終的にプロジェクトに残っているAPI一覧 (${TOTAL_FINAL_COUNT}件 / 想定通り3件):"
+    echo "📌 最終的にプロジェクトに残っているAPI一覧 (${TOTAL_FINAL_COUNT}件 / 想定内):"
 else
     EXTRA_COUNT=$(echo "${FINAL_TARGETS}" | wc -w)
-    echo "🚨 【要確認】基本3API以外に、以下の未停止API（${EXTRA_COUNT}件）が残存しています！"
+    echo "🚨 【要確認】基本API以外に、以下の未停止API（${EXTRA_COUNT}件）が残存しています！"
     for api in ${FINAL_TARGETS}; do
         echo "   🔴 停止未完了API: ${api}"
     done
     echo "   (※ 請求先アカウント未紐付け時や他リソースとの依存関係で残る場合があります)"
     echo ""
-    echo "⚠️ 最終的にプロジェクトに残っているAPI一覧 (${TOTAL_FINAL_COUNT}件 / 🚨注意: 基本3件を超えています):"
+    echo "⚠️ 最終的にプロジェクトに残っているAPI一覧 (${TOTAL_FINAL_COUNT}件 / 🚨注意: 基本APIを超えています):"
 fi
 
 # 美しいアイコン表示フォーマット出力
@@ -260,6 +264,9 @@ if [ -n "${FINAL_APIS}" ]; then
                 ;;
             "serviceusage.googleapis.com")
                 echo "   🟢 [維持OK] ${api} (Service Usage API)"
+                ;;
+            "cloudaicompanion.googleapis.com")
+                echo "   🟢 [維持OK] ${api} (Gemini for Google Cloud API)"
                 ;;
             *)
                 echo "   🔴 [要確認] ${api}"
