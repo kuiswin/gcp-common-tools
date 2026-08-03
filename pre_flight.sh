@@ -5,20 +5,35 @@ set -eu
 # GCP 共通プロビジョニング ＆ 事前チェック スクリプト
 # -----------------------------------------------------------------------------
 
+# 第1引数 ($1) または環境変数からの柔軟な値取得
+INPUT_ARG="${1:-}"
 KEYWORD="${KEYWORD:-abcde}"
 APP_PREFIX="${APP_PREFIX:-qm-app}"
+
+# 第1引数が数字（例: 170, 171）なら ARTICLE_ID、プロジェクトID文字列なら PROJECT_ID として自動判定
+if [ -n "${INPUT_ARG}" ]; then
+    if [[ "${INPUT_ARG}" =~ ^[0-9]+$ ]]; then
+        ARTICLE_ID="${INPUT_ARG}"
+    else
+        PROJECT_ID="${INPUT_ARG}"
+    fi
+fi
+
 ARTICLE_ID="${ARTICLE_ID:-170}"
 
 # 現在のgcloudアクティブプロジェクトの自動取得
 CURRENT_PROJECT="$(gcloud config get-value project </dev/null 2>/dev/null || echo "")"
 
 # プロジェクトIDの決定優先順位:
-# 1. 外部環境変数 PROJECT_ID
-# 2. 現在の gcloud アクティブプロジェクト CURRENT_PROJECT
-# 3. 自動組み立て (qm-app-abcde-170)
+# 1. 指定された PROJECT_ID
+# 2. 引数/変数で決定された ARTICLE_ID に基づくプロジェクト名 (qm-app-abcde-170 など)
+# 3. 現在の gcloud アクティブプロジェクト CURRENT_PROJECT
 PROJECT_PREFIX=$(echo "${APP_PREFIX}-${KEYWORD}-${ARTICLE_ID}" | tr '[:upper:]' '[:lower:]')
+
 if [ -n "${PROJECT_ID:-}" ]; then
     RESOLVED_PROJECT_ID="${PROJECT_ID}"
+elif [ -n "${ARTICLE_ID:-}" ]; then
+    RESOLVED_PROJECT_ID="${PROJECT_PREFIX}"
 elif [ -n "${CURRENT_PROJECT}" ] && [ "${CURRENT_PROJECT}" != "(unset)" ]; then
     RESOLVED_PROJECT_ID="${CURRENT_PROJECT}"
 else
