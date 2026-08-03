@@ -7,12 +7,26 @@ set -eu
 
 KEYWORD="${KEYWORD:-abcde}"
 APP_PREFIX="${APP_PREFIX:-qm-app}"
-ARTICLE_ID="${ARTICLE_ID:-171}"
-PROJECT_NAME="${PROJECT_NAME:-PubSub Pipeline - ${KEYWORD}}"
+ARTICLE_ID="${ARTICLE_ID:-170}"
 
-# プロジェクトIDの自動組み立て（外部指定 PROJECT_ID があれば優先）
+# 現在のgcloudアクティブプロジェクトの自動取得
+CURRENT_PROJECT="$(gcloud config get-value project </dev/null 2>/dev/null || echo "")"
+
+# プロジェクトIDの決定優先順位:
+# 1. 外部環境変数 PROJECT_ID
+# 2. 現在の gcloud アクティブプロジェクト CURRENT_PROJECT
+# 3. 自動組み立て (qm-app-abcde-170)
 PROJECT_PREFIX=$(echo "${APP_PREFIX}-${KEYWORD}-${ARTICLE_ID}" | tr '[:upper:]' '[:lower:]')
-PROJECT_ID="${PROJECT_ID:-${PROJECT_PREFIX}}"
+if [ -n "${PROJECT_ID:-}" ]; then
+    RESOLVED_PROJECT_ID="${PROJECT_ID}"
+elif [ -n "${CURRENT_PROJECT}" ] && [ "${CURRENT_PROJECT}" != "(unset)" ]; then
+    RESOLVED_PROJECT_ID="${CURRENT_PROJECT}"
+else
+    RESOLVED_PROJECT_ID="${PROJECT_PREFIX}"
+fi
+
+PROJECT_ID="${RESOLVED_PROJECT_ID}"
+PROJECT_NAME="${PROJECT_NAME:-GCP App - ${PROJECT_ID}}"
 
 echo ""
 echo "----------------------------------------"
@@ -43,7 +57,7 @@ fi
 
 BILLING_ACCOUNT_NAME=""
 if [ -n "${BILLING_ACCOUNT}" ]; then
-    BILLING_ACCOUNT_NAME=$(echo "y" | gcloud beta billing accounts list --filter="name:${BILLING_ACCOUNT}" --format="value(displayName)" </dev/null 2>/dev/null || true)
+    BILLING_ACCOUNT_NAME=$(echo "y" | gcloud beta billing accounts list --filter="name:${BILLING_ACCOUNT}" --format="value(displayName)" </dev/null 2>/dev/null | head -n 1 || true)
 fi
 
 echo ""
@@ -61,49 +75,47 @@ echo ""
 echo "----------------------------------------"
 echo "🔍 2. 課金状態の確認（Link前）"
 echo "----------------------------------------"
-RAW_IS_ENABLED=$(gcloud beta billing projects describe "${PROJECT_ID}" --format="value(billingEnabled)" </dev/null 2>/dev/null || echo "false")
-IS_ENABLED=$(echo "${RAW_IS_ENABLED}" | tr '[:upper:]' '[:lower:]')
+RAW_ENABLED="$(gcloud beta billing projects describe "${PROJECT_ID}" --format="value(billingEnabled)" </dev/null 2>/dev/null || echo "false")"
+IS_ENABLED="$(echo "${RAW_ENABLED}" | tr '[:upper:]' '[:lower:]')"
 
 if [ "${IS_ENABLED}" = "true" ]; then
-    echo "ℹ️ 課金状態: リンク済み（True）"
+    echo "⚠️ 課金状態: リンク済み（True） - 【注意】すでに課金が有効化されている状態です"
 else
-    echo "✅ 課金状態: 未リンク（False） - 【想定通り】現在課金は紐付けられていません（安全）"
+    echo "✅ 課金状態: 未リンク（False） - 【想定通り】現在課金は紐付けられていません（休眠状態）"
 fi
 
 echo ""
 echo "----------------------------------------"
-echo "🔍 3. 有効なAPIサービス一覧の確認（プロビジョニング前）"
+echo "🔍 3. 有効な基本API一覧の確認"
 echo "----------------------------------------"
-gcloud services list --enabled --project="${PROJECT_ID}" </dev/null || true
+gcloud services list --enabled --project="${PROJECT_ID}" </dev/null 2>/dev/null || true
 
 echo ""
 echo "----------------------------------------"
-echo "🔍 4. プロジェクト内リソースの目視確認（プロビジョニング前）"
-echo "----------------------------------------"
-echo "y" | gcloud asset search-all-resources --scope="projects/${PROJECT_ID}" --query="NOT name:serviceusage AND NOT name:logging AND NOT name:cloudresourcemanager AND NOT name:cloudbilling" --format="table(name, assetType)" </dev/null 2>/dev/null || echo "リソースなし"
-
-echo ""
-echo "----------------------------------------"
-echo "⚡ 5. 課金アカウントの有効化（Link）"
+echo "⚡ 4. 請求先アカウントの有効化（Link）"
 echo "----------------------------------------"
 if [ -n "${BILLING_ACCOUNT}" ]; then
-    gcloud beta billing projects link "${PROJECT_ID}" --billing-account="${BILLING_ACCOUNT}" --quiet </dev/null || true
+    gcloud beta billing projects link "${PROJECT_ID}" --billing-account="${BILLING_ACCOUNT}" --quiet </dev/null 2>/dev/null || true
+    echo "🔄 紐付け処理の反映を待っています (2秒)..."
+    sleep 2
 else
-    echo "⚠️ 有効な請求先アカウントが見つかりませんでした。"
+    echo "❌ 有効な請求先アカウントが検出されませんでした。"
 fi
-
-sleep 2
 
 echo ""
 echo "----------------------------------------"
-echo "🔍 6. 課金状態の確認（Link後）"
+echo "🔍 5. 課金状態の最終確認（Link後）"
 echo "----------------------------------------"
-RAW_AFTER=$(gcloud beta billing projects describe "${PROJECT_ID}" --format="value(billingEnabled)" </dev/null 2>/dev/null || echo "false")
-IS_ENABLED_AFTER=$(echo "${RAW_AFTER}" | tr '[:upper:]' '[:lower:]')
+RAW_AFTER="$(gcloud beta billing projects describe "${PROJECT_ID}" --format="value(billingEnabled)" </dev/null 2>/dev/null || echo "false")"
+AFTER_ENABLED="$(echo "${RAW_AFTER}" | tr '[:upper:]' '[:lower:]')"
 
-if [ "${IS_ENABLED_AFTER}" = "true" ]; then
+if [ "${AFTER_ENABLED}" = "true" ]; then
     echo "✅ 課金状態: リンク完了（True） - 【成功】課金アカウントが正しく有効化されました！"
 else
-    echo "⚠️ 課金状態: 未リンク（False） - 請求先アカウントの紐付けを確認してください。"
+    echo "❌ 課金状態: 未リンク（False） - 課金アカウントの有効化に失敗したか保留中です"
 fi
+
 echo ""
+echo "========================================================"
+echo "🚀 事前準備 ＆ 課金ON（起爆）が完了しました！ハンズオンを開始できます。"
+echo "========================================================"
