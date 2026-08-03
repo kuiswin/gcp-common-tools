@@ -27,7 +27,7 @@ echo "🔍 1. 個別サービス・リソースのチェック ＆ 削除"
 echo "--------------------------------------------------------"
 
 # 1-1. Cloud Run
-echo "🔎 【1/7】Cloud Run サービスのチェックを行っています..."
+echo "🔎 【1/8】Cloud Run サービスのチェックを行っています..."
 SERVICES="$(gcloud run services list --project="${PROJECT_ID}" --format="value(metadata.name)" </dev/null 2>/dev/null || echo "")"
 if [ -n "${SERVICES}" ]; then
     echo "⚠️ 以下の残存サービスを検出しました:"
@@ -47,7 +47,7 @@ fi
 echo ""
 
 # 1-2. Pub/Sub
-echo "🔎 【2/7】Pub/Sub (トピック・サブスクリプション) のチェックを行っています..."
+echo "🔎 【2/8】Pub/Sub (トピック・サブスクリプション) のチェックを行っています..."
 SUBS="$(gcloud pubsub subscriptions list --project="${PROJECT_ID}" --format="value(name)" </dev/null 2>/dev/null || echo "")"
 TOPICS="$(gcloud pubsub topics list --project="${PROJECT_ID}" --format="value(name)" </dev/null 2>/dev/null || echo "")"
 if [ -n "${SUBS}" ] || [ -n "${TOPICS}" ]; then
@@ -69,7 +69,7 @@ fi
 echo ""
 
 # 1-3. Cloud Storage (GCS)
-echo "🔎 【3/7】Cloud Storage (GCS バケット) のチェックを行っています..."
+echo "🔎 【3/8】Cloud Storage (GCS バケット) のチェックを行っています..."
 BUCKETS="$(gcloud storage ls --project="${PROJECT_ID}" </dev/null 2>/dev/null || echo "")"
 if [ -n "${BUCKETS}" ]; then
     echo "⚠️ 以下の残存バケットを検出しました:"
@@ -87,7 +87,7 @@ fi
 echo ""
 
 # 1-4. Cloud Spanner
-echo "🔎 【4/7】Cloud Spanner インスタンスのチェックを行っています..."
+echo "🔎 【4/8】Cloud Spanner インスタンスのチェックを行っています..."
 SPANNER="$(gcloud spanner instances list --project="${PROJECT_ID}" --format="value(name)" </dev/null 2>/dev/null || echo "")"
 if [ -n "${SPANNER}" ]; then
     echo "⚠️ 以下の残存インスタンスを検出しました:"
@@ -105,7 +105,7 @@ fi
 echo ""
 
 # 1-5. AlloyDB
-echo "🔎 【5/7】AlloyDB クラスターのチェックを行っています..."
+echo "🔎 【5/8】AlloyDB クラスターのチェックを行っています..."
 ALLOY="$(gcloud alloydb clusters list --project="${PROJECT_ID}" --format="value(name)" </dev/null 2>/dev/null || echo "")"
 if [ -n "${ALLOY}" ]; then
     echo "⚠️ 以下の残存クラスターを検出しました:"
@@ -123,7 +123,7 @@ fi
 echo ""
 
 # 1-6. Artifact Registry
-echo "🔎 【6/7】Artifact Registry リポジトリのチェックを行っています..."
+echo "🔎 【6/8】Artifact Registry リポジトリのチェックを行っています..."
 AR_REPOS="$(gcloud artifacts repositories list --project="${PROJECT_ID}" --format="value(name)" </dev/null 2>/dev/null || echo "")"
 if [ -n "${AR_REPOS}" ]; then
     echo "⚠️ 以下の残存リポジトリを検出しました:"
@@ -140,8 +140,26 @@ else
 fi
 echo ""
 
-# 1-7. IAM Service Accounts
-echo "🔎 【7/7】IAM 専用サービスアカウントのチェックを行っています..."
+# 1-7. Vertex AI Endpoints (Gemini / ML Endpoints)
+echo "🔎 【7/8】Vertex AI (Gemini / 機械学習) 常駐エンドポイントのチェックを行っています..."
+AI_ENDPOINTS="$(gcloud ai endpoints list --project="${PROJECT_ID}" --region=us-central1 --format="value(name)" </dev/null 2>/dev/null || echo "")"
+if [ -n "${AI_ENDPOINTS}" ]; then
+    echo "⚠️ 以下の残存Vertex AIエンドポイントを検出しました:"
+    for ep in ${AI_ENDPOINTS}; do echo "   👉 Vertex AI Endpoint: ${ep}"; done
+    echo "🗑️ 削除処理を実行します..."
+    for ep in ${AI_ENDPOINTS}; do gcloud ai endpoints delete "${ep}" --project="${PROJECT_ID}" --region=us-central1 --quiet </dev/null 2>/dev/null || true; done
+    echo "🔄 削除後の再確認を行っています..."
+    CHECK_AI="$(gcloud ai endpoints list --project="${PROJECT_ID}" --region=us-central1 --format="value(name)" </dev/null 2>/dev/null || echo "")"
+    if [ -z "${CHECK_AI}" ]; then
+        echo "✅ 削除完了を確認しました！（Vertex AI エンドポイント: 0件）"
+    fi
+else
+    echo "ℹ️ Vertex AI エンドポイントは検出されませんでした（すでにクリーンです）"
+fi
+echo ""
+
+# 1-8. IAM Service Accounts
+echo "🔎 【8/8】IAM 専用サービスアカウントのチェックを行っています..."
 SAS="$(gcloud iam service-accounts list --project="${PROJECT_ID}" --format="value(email)" </dev/null 2>/dev/null || echo "")"
 TARGET_SAS=""
 if [ -n "${SAS}" ]; then
@@ -185,7 +203,7 @@ if [ -n "${ENABLED_APIS}" ]; then
 fi
 
 if [ -n "${TARGET_APIS}" ]; then
-    echo "⚠️ 以下の不要API（無効化対象）が有効になっています:"
+    echo "⚠️ 以下の不要API（Gemini/Vertex AI/Translation等を含む無効化対象）が有効になっています:"
     for api in ${TARGET_APIS}; do echo "   👉 無効化対象API: ${api}"; done
     echo "🗑️ 不要APIの無効化処理を実行します..."
     echo "${TARGET_APIS}" | xargs -r -I {} gcloud services disable {} --project="${PROJECT_ID}" --force --quiet </dev/null 2>/dev/null || true
