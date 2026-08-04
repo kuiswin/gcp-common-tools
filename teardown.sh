@@ -98,12 +98,18 @@ gcloud services enable \
 
 TOTAL=${#RESOURCE_TARGETS[@]}
 
-# 1-1. Cloud Run
+# 1-1. Cloud Run (サービス / ジョブ)
 cleanup_resource "1" "${TOTAL}" "Cloud Run サービス" \
-    "gcloud run services list --project=\"${PROJECT_ID}\" --format=\"value(metadata.name)\"" \
+    "gcloud run services list --project=\"${PROJECT_ID}\" --region=us-central1 --format=\"value(metadata.name)\"" \
     "gcloud run services delete" \
     "--project=\"${PROJECT_ID}\" --quiet --region=us-central1" \
     "Cloud Run サービス"
+
+cleanup_resource "1b" "${TOTAL}" "Cloud Run ジョブ" \
+    "gcloud run jobs list --project=\"${PROJECT_ID}\" --region=us-central1 --format=\"value(metadata.name)\"" \
+    "gcloud run jobs delete" \
+    "--project=\"${PROJECT_ID}\" --quiet --region=us-central1" \
+    "Cloud Run ジョブ"
 
 # 1-2. Pub/Sub
 echo "🔎 【2/${TOTAL}】Pub/Sub (トピック・サブスクリプション) のチェックを行っています..."
@@ -143,9 +149,9 @@ cleanup_resource "4" "${TOTAL}" "Cloud Spanner インスタンス" \
 
 # 1-5. AlloyDB
 cleanup_resource "5" "${TOTAL}" "AlloyDB クラスター" \
-    "gcloud alloydb clusters list --project=\"${PROJECT_ID}\" --format=\"value(name)\"" \
+    "gcloud alloydb clusters list --project=\"${PROJECT_ID}\" --region=us-central1 --format=\"value(name)\"" \
     "gcloud alloydb clusters delete" \
-    "--project=\"${PROJECT_ID}\" --region=us-central1 --quiet" \
+    "--project=\"${PROJECT_ID}\" --region=us-central1 --force --quiet" \
     "AlloyDB クラスター"
 
 # 1-6. Cloud Bigtable
@@ -193,7 +199,7 @@ SAS="$(gcloud iam service-accounts list --project="${PROJECT_ID}" --format="valu
 TARGET_SAS=""
 if [ -n "${SAS}" ]; then
     for sa in ${SAS}; do
-        if [[ "${sa}" != *"-compute@developer.gserviceaccount.com"* && "${sa}" != *"@appspot.gserviceaccount.com"* ]]; then
+        if [[ "${sa}" != *"-compute@developer.gserviceaccount.com"* && "${sa}" != *"@appspot.gserviceaccount.com"* && "${sa}" != *"@gcp-sa-"* ]]; then
             TARGET_SAS="${TARGET_SAS} ${sa}"
         fi
     done
@@ -218,7 +224,7 @@ echo "🔍 2. 有効なAPIサービスのチェック ＆ 無効化"
 echo "--------------------------------------------------------"
 
 # 基本APIホワイトリストパターン (grep -E 用)
-WHITELIST_REGEX="cloudresourcemanager.googleapis.com|serviceusage.googleapis.com|cloudbilling.googleapis.com|cloudaicompanion.googleapis.com"
+WHITELIST_REGEX="cloudresourcemanager.googleapis.com|serviceusage.googleapis.com|cloudbilling.googleapis.com|cloudaicompanion.googleapis.com|iam.googleapis.com|iamcredentials.googleapis.com|logging.googleapis.com"
 
 echo "📌 【定義】プロジェクト維持のため「残して良い基本API (ホワイトリスト)」:"
 echo "   🟢 cloudbilling.googleapis.com (Cloud Billing API)"
