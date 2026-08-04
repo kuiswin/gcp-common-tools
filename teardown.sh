@@ -85,19 +85,6 @@ done
 echo "--------------------------------------------------------"
 echo ""
 
-# 削除走査用APIの一時有効化（API無効化状態によるリスト取得漏れ防止）
-gcloud services enable \
-    run.googleapis.com \
-    pubsub.googleapis.com \
-    storage.googleapis.com \
-    spanner.googleapis.com \
-    alloydb.googleapis.com \
-    bigtable.googleapis.com \
-    artifactregistry.googleapis.com \
-    secretmanager.googleapis.com \
-    aiplatform.googleapis.com \
-    --project="${PROJECT_ID}" --quiet </dev/null 2>/dev/null || true
-
 TOTAL=${#RESOURCE_TARGETS[@]}
 
 # 1-1. Cloud Run
