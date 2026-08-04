@@ -236,6 +236,7 @@ if [ -n "${ENABLED_APIS}" ]; then
 fi
 
 if [ -n "${TARGET_APIS}" ]; then
+    echo "💡 (※STEP 1の削除走査時に、API停止による削除漏れを100%防止するため、走査用管理APIを一時有効化して完全チェックを行っています)"
     echo "⚠️ 以下の不要API（無効化対象）が有効になっています:"
     for api in ${TARGET_APIS}; do echo "   👉 無効化対象API: ${api}"; done
     echo "🗑️ 不要APIの無効化処理を実行します..."
