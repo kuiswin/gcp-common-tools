@@ -19,8 +19,6 @@ if [ -n "${INPUT_ARG}" ]; then
     fi
 fi
 
-ARTICLE_ID="${ARTICLE_ID:-170}"
-
 # 現在のgcloudアクティブプロジェクトの自動取得
 CURRENT_PROJECT="$(gcloud config get-value project </dev/null 2>/dev/null || echo "")"
 
@@ -28,15 +26,17 @@ CURRENT_PROJECT="$(gcloud config get-value project </dev/null 2>/dev/null || ech
 # 1. 指定された PROJECT_ID
 # 2. 引数/変数で決定された ARTICLE_ID に基づくプロジェクト名 (qm-app-abcde-170 など)
 # 3. 現在の gcloud アクティブプロジェクト CURRENT_PROJECT
-PROJECT_PREFIX=$(echo "${APP_PREFIX}-${KEYWORD}-${ARTICLE_ID}" | tr '[:upper:]' '[:lower:]')
-
+# 4. デフォルト (qm-app-abcde-170)
 if [ -n "${PROJECT_ID:-}" ]; then
     RESOLVED_PROJECT_ID="${PROJECT_ID}"
 elif [ -n "${ARTICLE_ID:-}" ]; then
+    PROJECT_PREFIX=$(echo "${APP_PREFIX}-${KEYWORD}-${ARTICLE_ID}" | tr '[:upper:]' '[:lower:]')
     RESOLVED_PROJECT_ID="${PROJECT_PREFIX}"
 elif [ -n "${CURRENT_PROJECT}" ] && [ "${CURRENT_PROJECT}" != "(unset)" ]; then
     RESOLVED_PROJECT_ID="${CURRENT_PROJECT}"
 else
+    ARTICLE_ID="170"
+    PROJECT_PREFIX=$(echo "${APP_PREFIX}-${KEYWORD}-${ARTICLE_ID}" | tr '[:upper:]' '[:lower:]')
     RESOLVED_PROJECT_ID="${PROJECT_PREFIX}"
 fi
 
@@ -63,16 +63,16 @@ echo ""
 echo "----------------------------------------"
 echo "🔍 0. 利用可能な有効請求先アカウント一覧"
 echo "----------------------------------------"
-echo "y" | gcloud beta billing accounts list --filter="open=true" </dev/null || true
+gcloud beta billing accounts list --filter="open=true" --quiet </dev/null 2>/dev/null || true
 
-BILLING_ACCOUNT=$(echo "y" | gcloud beta billing accounts list --filter="open=true AND displayName ~ '${KEYWORD}'" --format="value(name)" </dev/null 2>/dev/null | head -n 1 || true)
+BILLING_ACCOUNT=$(gcloud beta billing accounts list --filter="open=true AND displayName ~ '${KEYWORD}'" --format="value(name)" --limit=1 --quiet </dev/null 2>/dev/null || true)
 if [ -z "${BILLING_ACCOUNT}" ]; then
-    BILLING_ACCOUNT=$(echo "y" | gcloud beta billing accounts list --filter="open=true" --format="value(name)" </dev/null 2>/dev/null | head -n 1 || true)
+    BILLING_ACCOUNT=$(gcloud beta billing accounts list --filter="open=true" --format="value(name)" --limit=1 --quiet </dev/null 2>/dev/null || true)
 fi
 
 BILLING_ACCOUNT_NAME=""
 if [ -n "${BILLING_ACCOUNT}" ]; then
-    BILLING_ACCOUNT_NAME=$(echo "y" | gcloud beta billing accounts list --filter="name:${BILLING_ACCOUNT}" --format="value(displayName)" </dev/null 2>/dev/null | head -n 1 || true)
+    BILLING_ACCOUNT_NAME=$(gcloud beta billing accounts list --filter="name:${BILLING_ACCOUNT}" --format="value(displayName)" --limit=1 --quiet </dev/null 2>/dev/null || true)
 fi
 
 echo ""
