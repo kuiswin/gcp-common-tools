@@ -83,7 +83,18 @@ for i in "${!RESOURCE_TARGETS[@]}"; do
     echo "   $((i+1)). ${RESOURCE_TARGETS[$i]}"
 done
 echo "--------------------------------------------------------"
-echo ""
+# 削除走査用APIの有効化（API停止状態による検出漏れ・削除漏れ防止）
+gcloud services enable \
+    run.googleapis.com \
+    pubsub.googleapis.com \
+    storage.googleapis.com \
+    spanner.googleapis.com \
+    alloydb.googleapis.com \
+    bigtable.googleapis.com \
+    artifactregistry.googleapis.com \
+    secretmanager.googleapis.com \
+    aiplatform.googleapis.com \
+    --project="${PROJECT_ID}" --quiet </dev/null 2>/dev/null || true
 
 TOTAL=${#RESOURCE_TARGETS[@]}
 
