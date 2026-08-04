@@ -85,6 +85,19 @@ done
 echo "--------------------------------------------------------"
 echo ""
 
+# 削除走査用APIの一時有効化（API無効化状態によるリスト取得漏れ防止）
+gcloud services enable \
+    run.googleapis.com \
+    pubsub.googleapis.com \
+    storage.googleapis.com \
+    spanner.googleapis.com \
+    alloydb.googleapis.com \
+    bigtable.googleapis.com \
+    artifactregistry.googleapis.com \
+    secretmanager.googleapis.com \
+    aiplatform.googleapis.com \
+    --project="${PROJECT_ID}" --quiet </dev/null 2>/dev/null || true
+
 TOTAL=${#RESOURCE_TARGETS[@]}
 
 # 1-1. Cloud Run
@@ -145,11 +158,22 @@ cleanup_resource "6" "${TOTAL}" "Cloud Bigtable インスタンス" \
     "Bigtable インスタンス"
 
 # 1-7. Artifact Registry
-cleanup_resource "7" "${TOTAL}" "Artifact Registry リポジトリ" \
-    "gcloud artifacts repositories list --project=\"${PROJECT_ID}\" --format=\"value(name)\"" \
-    "gcloud artifacts repositories delete" \
-    "--project=\"${PROJECT_ID}\" --location=us-central1 --quiet" \
-    "Artifact Registry リポジトリ"
+echo "🔎 【7/${TOTAL}】Artifact Registry リポジトリ のチェックを行っています..."
+REPOS="$(gcloud artifacts repositories list --project="${PROJECT_ID}" --format="value(name)" </dev/null 2>/dev/null || echo "")"
+if [ -n "${REPOS}" ]; then
+    echo "⚠️ 以下の残存リソースを検出しました:"
+    for repo in ${REPOS}; do echo "   👉 Repository: ${repo}"; done
+    echo "🗑️ 削除処理を実行します..."
+    for repo in ${REPOS}; do
+        REPO_NAME="$(echo "${repo}" | awk -F'/' '{print $NF}')"
+        REPO_LOC="$(echo "${repo}" | awk -F'/' '{print $4}')"
+        gcloud artifacts repositories delete "${REPO_NAME}" --location="${REPO_LOC}" --project="${PROJECT_ID}" --quiet </dev/null 2>/dev/null || true
+    done
+    echo "✅ 削除処理を完了しました！（Artifact Registry）"
+else
+    echo "ℹ️ Artifact Registry リポジトリ は検出されませんでした（すでにクリーンです）"
+fi
+echo ""
 
 # 1-8. Secret Manager
 cleanup_resource "8" "${TOTAL}" "Secret Manager シークレット" \
