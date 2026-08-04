@@ -94,9 +94,13 @@ RAW_ENABLED="$(gcloud beta billing projects describe "${PROJECT_ID}" --format="v
 IS_ENABLED="$(echo "${RAW_ENABLED}" | tr '[:upper:]' '[:lower:]')"
 
 if [ "${IS_ENABLED}" = "true" ]; then
-    echo "⚠️ 課金状態: リンク済み（True） - 【注意】すでに課金が有効化されている状態です"
+    echo "🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨"
+    echo "⚠️  【警告】すでに課金アカウントがリンクされています！(billingEnabled: True)"
+    echo "    ※想定: 本来は0円休眠状態 (False) から事前準備を行う流れです。"
+    echo "    ※連続実行、または前回のハンズオンクリーンアップ未完了の可能性があります。"
+    echo "🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨"
 else
-    echo "✅ 課金状態: 未リンク（False） - 【想定通り】現在課金は紐付けられていません（休眠状態）"
+    echo "✅ 課金状態: 未リンク（False） - 【想定通り】現在課金は紐付けられていません（安全な休眠状態）"
 fi
 
 echo ""
