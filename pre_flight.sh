@@ -103,11 +103,36 @@ echo ""
 echo "----------------------------------------"
 echo "🔍 3. 有効な基本API一覧の確認"
 echo "----------------------------------------"
-gcloud services list --enabled --project="${PROJECT_ID}" </dev/null 2>/dev/null || true
+echo "📌 [期待される標準基盤API（休眠時の最小構成）]:"
+echo "  - cloudaicompanion.googleapis.com (Gemini for Google Cloud API)"
+echo "  - cloudbilling.googleapis.com (Cloud Billing API)"
+echo "  - cloudresourcemanager.googleapis.com (Cloud Resource Manager API)"
+echo "  - serviceusage.googleapis.com (Service Usage API)"
 echo ""
-echo "💡 【判定結果】上記の通り、最小限の基盤APIのみが有効化されている状態です。"
-echo "   余計な拡張サービス（Cloud Run, Spanner, AlloyDB等）は一切動作しておらず、"
-echo "   前回のクリーンアップ（0円休眠化）が完璧に機能していた安全な状態が証明されました！"
+echo "📌 [現在有効なAPI一覧（実効値）]:"
+ACTUAL_APIS="$(gcloud services list --enabled --project="${PROJECT_ID}" --format="value(config.name)" </dev/null 2>/dev/null || echo "")"
+gcloud services list --enabled --project="${PROJECT_ID}" </dev/null 2>/dev/null || true
+
+EXTRA_APIS=()
+if [ -n "${ACTUAL_APIS}" ]; then
+    while read -r api; do
+        [ -z "${api}" ] && continue
+        case "${api}" in
+            cloudaicompanion.googleapis.com|cloudbilling.googleapis.com|cloudresourcemanager.googleapis.com|serviceusage.googleapis.com|iam.googleapis.com|iamcredentials.googleapis.com|logging.googleapis.com)
+                ;;
+            *)
+                EXTRA_APIS+=("${api}")
+                ;;
+        esac
+    done <<< "${ACTUAL_APIS}"
+fi
+
+echo ""
+if [ ${#EXTRA_APIS[@]} -eq 0 ]; then
+    echo "✅ 最小限の基盤APIのみ有効化されています（安全な休眠状態）"
+else
+    echo "⚠️ 拡張APIが残っています: ${EXTRA_APIS[*]}"
+fi
 
 echo ""
 echo "----------------------------------------"
