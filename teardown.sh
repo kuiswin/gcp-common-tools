@@ -297,6 +297,15 @@ if [ -n "${FINAL_APIS}" ]; then
             "cloudaicompanion.googleapis.com")
                 echo "   🟢 [維持OK] ${api} (Gemini for Google Cloud API)"
                 ;;
+            "iam.googleapis.com")
+                echo "   🟢 [維持OK] ${api} (Identity and Access Management API)"
+                ;;
+            "iamcredentials.googleapis.com")
+                echo "   🟢 [維持OK] ${api} (IAM Service Account Credentials API)"
+                ;;
+            "logging.googleapis.com")
+                echo "   🟢 [維持OK] ${api} (Cloud Logging API)"
+                ;;
             *)
                 echo "   🔴 [要確認] ${api}"
                 ;;
