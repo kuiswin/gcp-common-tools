@@ -60,12 +60,20 @@ cleanup_resource() {
         for item in ${items}; do
             eval "${del_cmd_prefix} \"${item}\" ${del_cmd_suffix}" </dev/null 2>/dev/null || true
         done
-        echo "🔄 削除後の再確認を行っています..."
-        local check_items
-        check_items="$(eval "${list_cmd}" </dev/null 2>/dev/null || echo "")"
-        if [ -z "${check_items}" ]; then
-            echo "✅ 削除完了を確認しました！（${label_name}: 0件）"
-        fi
+        echo "🔄 削除完了の同期検証を行っています..."
+        local retry=0
+        while [ ${retry} -lt 15 ]; do
+            local check_items
+            check_items="$(eval "${list_cmd}" </dev/null 2>/dev/null || echo "")"
+            if [ -z "${check_items}" ]; then
+                echo "✅ 削除完了を確認しました！（${label_name}: 0件）"
+                echo ""
+                return 0
+            fi
+            sleep 2
+            retry=$((retry + 1))
+        done
+        echo "⚠️ 削除要求発行済み（バックグラウンド完全反映待ち）"
     else
         echo "ℹ️ ${label_name} は検出されませんでした（すでにクリーンです）"
     fi
@@ -95,6 +103,7 @@ gcloud services enable \
     secretmanager.googleapis.com \
     aiplatform.googleapis.com \
     --project="${PROJECT_ID}" --quiet </dev/null 2>/dev/null || true
+sleep 2
 
 TOTAL=${#RESOURCE_TARGETS[@]}
 
@@ -122,12 +131,18 @@ if [ -n "${SUBS}" ] || [ -n "${TOPICS}" ]; then
     echo "🗑️ 削除処理を実行します..."
     for sub in ${SUBS}; do gcloud pubsub subscriptions delete "${sub}" --project="${PROJECT_ID}" --quiet </dev/null 2>/dev/null || true; done
     for t in ${TOPICS}; do gcloud pubsub topics delete "${t}" --project="${PROJECT_ID}" --quiet </dev/null 2>/dev/null || true; done
-    echo "🔄 削除後の再確認を行っています..."
-    CHECK_SUBS="$(gcloud pubsub subscriptions list --project="${PROJECT_ID}" --format="value(name)" </dev/null 2>/dev/null || echo "")"
-    CHECK_TOPICS="$(gcloud pubsub topics list --project="${PROJECT_ID}" --format="value(name)" </dev/null 2>/dev/null || echo "")"
-    if [ -z "${CHECK_SUBS}" ] && [ -z "${CHECK_TOPICS}" ]; then
-        echo "✅ 削除完了を確認しました！（Pub/Sub: 0件）"
-    fi
+    echo "🔄 削除完了の同期検証を行っています..."
+    retry=0
+    while [ ${retry} -lt 15 ]; do
+        CHECK_SUBS="$(gcloud pubsub subscriptions list --project="${PROJECT_ID}" --format="value(name)" </dev/null 2>/dev/null || echo "")"
+        CHECK_TOPICS="$(gcloud pubsub topics list --project="${PROJECT_ID}" --format="value(name)" </dev/null 2>/dev/null || echo "")"
+        if [ -z "${CHECK_SUBS}" ] && [ -z "${CHECK_TOPICS}" ]; then
+            echo "✅ 削除完了を確認しました！（Pub/Sub: 0件）"
+            break
+        fi
+        sleep 2
+        retry=$((retry + 1))
+    done
 else
     echo "ℹ️ Pub/Sub リソースは検出されませんでした（すでにクリーンです）"
 fi
@@ -173,13 +188,17 @@ if [ -n "${REPOS}" ]; then
         REPO_LOC="$(echo "${repo}" | awk -F'/' '{print $4}')"
         gcloud artifacts repositories delete "${REPO_NAME}" --location="${REPO_LOC}" --project="${PROJECT_ID}" --quiet </dev/null 2>/dev/null || true
     done
-    echo "🔄 削除後の再確認を行っています..."
-    CHECK_REPOS="$(gcloud artifacts repositories list --project="${PROJECT_ID}" --format="value(name)" </dev/null 2>/dev/null || echo "")"
-    if [ -z "${CHECK_REPOS}" ]; then
-        echo "✅ 削除完了を確認しました！（Artifact Registry: 0件）"
-    else
-        echo "⚠️ 削除処理を実行しました（残存 ${CHECK_REPOS} のパージをバックグラウンド完了待ち）"
-    fi
+    echo "🔄 削除完了の同期検証を行っています..."
+    retry=0
+    while [ ${retry} -lt 15 ]; do
+        CHECK_REPOS="$(gcloud artifacts repositories list --project="${PROJECT_ID}" --format="value(name)" </dev/null 2>/dev/null || echo "")"
+        if [ -z "${CHECK_REPOS}" ]; then
+            echo "✅ 削除完了を確認しました！（Artifact Registry: 0件）"
+            break
+        fi
+        sleep 2
+        retry=$((retry + 1))
+    done
 else
     echo "ℹ️ Artifact Registry リポジトリ は検出されませんでした（すでにクリーンです）"
 fi
@@ -215,8 +234,25 @@ if [ -n "${TARGET_SAS}" ]; then
     for sa in ${TARGET_SAS}; do echo "   👉 Service Account: ${sa}"; done
     echo "🗑️ 削除処理を実行します..."
     for sa in ${TARGET_SAS}; do gcloud iam service-accounts delete "${sa}" --project="${PROJECT_ID}" --quiet </dev/null 2>/dev/null || true; done
-    echo "🔄 削除後の再確認を行っています..."
-    echo "✅ 削除完了を確認しました！（専用サービスアカウント: 0件）"
+    echo "🔄 削除完了の同期検証を行っています..."
+    retry=0
+    while [ ${retry} -lt 15 ]; do
+        CHK_SAS="$(gcloud iam service-accounts list --project="${PROJECT_ID}" --format="value(email)" </dev/null 2>/dev/null || echo "")"
+        CHK_TARGET=""
+        if [ -n "${CHK_SAS}" ]; then
+            for sa in ${CHK_SAS}; do
+                if [[ "${sa}" != *"-compute@developer.gserviceaccount.com"* && "${sa}" != *"@appspot.gserviceaccount.com"* && "${sa}" != *"@gcp-sa-"* ]]; then
+                    CHK_TARGET="${CHK_TARGET} ${sa}"
+                fi
+            done
+        fi
+        if [ -z "${CHK_TARGET}" ]; then
+            echo "✅ 削除完了を確認しました！（専用サービスアカウント: 0件）"
+            break
+        fi
+        sleep 2
+        retry=$((retry + 1))
+    done
 else
     echo "ℹ️ 専用サービスアカウントは検出されませんでした（すでにクリーンです）"
 fi
