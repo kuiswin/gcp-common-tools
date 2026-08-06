@@ -105,37 +105,40 @@ fi
 
 echo ""
 echo "----------------------------------------"
-echo "🔍 3. 有効な基本API一覧の確認"
+echo "🔍 3. 有効なAPIの安全・分類チェック"
 echo "----------------------------------------"
-echo "📌 [期待される標準基盤API（休眠時の最小構成）]:"
-echo "  - cloudaicompanion.googleapis.com (Gemini for Google Cloud API)"
-echo "  - cloudbilling.googleapis.com (Cloud Billing API)"
-echo "  - cloudresourcemanager.googleapis.com (Cloud Resource Manager API)"
-echo "  - serviceusage.googleapis.com (Service Usage API)"
+echo "📌 [期待される標準・無料基盤構成]:"
+echo "  - ✅ 基本システムAPI: Billing, Resource Manager, Service Usage, IAM, Cloud Logging (完全無料)"
+echo "  - ℹ️ Webコンソール自動アシスト: Gemini for Google Cloud / Gemini Cloud Assist (完全無料)"
 echo ""
-echo "📌 [現在有効なAPI一覧（実効値）]:"
+echo "📌 [現在有効なAPI一覧（分類表示）]:"
 ACTUAL_APIS="$(gcloud services list --enabled --project="${PROJECT_ID}" --format="value(config.name)" </dev/null 2>/dev/null || echo "")"
-gcloud services list --enabled --project="${PROJECT_ID}" </dev/null 2>/dev/null || true
 
-EXTRA_APIS=()
+PAID_RESOURCE_APIS=()
 if [ -n "${ACTUAL_APIS}" ]; then
     while read -r api; do
         [ -z "${api}" ] && continue
         case "${api}" in
-            cloudaicompanion.googleapis.com|cloudbilling.googleapis.com|cloudresourcemanager.googleapis.com|serviceusage.googleapis.com|iam.googleapis.com|iamcredentials.googleapis.com|logging.googleapis.com)
+            cloudbilling.googleapis.com|cloudresourcemanager.googleapis.com|serviceusage.googleapis.com|iam.googleapis.com|iamcredentials.googleapis.com|logging.googleapis.com)
+                echo "  ✅ [基本無料機能] ${api}"
+                ;;
+            cloudaicompanion.googleapis.com|geminicloudassist.googleapis.com)
+                echo "  ℹ️ [画面操作で自動ON・無料] ${api}"
                 ;;
             *)
-                EXTRA_APIS+=("${api}")
+                echo "  ⚠️ [有料/リソース拡張API] ${api}"
+                PAID_RESOURCE_APIS+=("${api}")
                 ;;
         esac
     done <<< "${ACTUAL_APIS}"
 fi
 
 echo ""
-if [ ${#EXTRA_APIS[@]} -eq 0 ]; then
-    echo "✅ 最小限の基盤APIのみ有効化されています（安全な休眠状態）"
+if [ ${#PAID_RESOURCE_APIS[@]} -eq 0 ]; then
+    echo "✅ 【完全安全】有料リソース（DBやコンテナ等）の拡張APIは1つもありません！"
+    echo "   安心してお進みいただけます。（完全な0円休眠状態からの復帰です）"
 else
-    echo "⚠️ 拡張APIが残っています: ${EXTRA_APIS[*]}"
+    echo "⚠️ 【確認】以下の有料/リソース拡張APIが残存しています: ${PAID_RESOURCE_APIS[*]}"
 fi
 
 echo ""
