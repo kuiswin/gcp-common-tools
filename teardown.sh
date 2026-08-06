@@ -178,16 +178,18 @@ cleanup_resource "6" "${TOTAL}" "Cloud Bigtable インスタンス" \
 
 # 1-7. Artifact Registry
 echo "🔎 【7/${TOTAL}】Artifact Registry リポジトリ のチェックを行っています..."
-REPOS="$(gcloud artifacts repositories list --project="${PROJECT_ID}" --format="value(name)" </dev/null 2>/dev/null || echo "")"
-if [ -n "${REPOS}" ]; then
+REPOS_INFO="$(gcloud artifacts repositories list --project="${PROJECT_ID}" --format="csv[no-heading](name,location)" </dev/null 2>/dev/null || echo "")"
+if [ -n "${REPOS_INFO}" ]; then
     echo "⚠️ 以下の残存リソースを検出しました:"
-    for repo in ${REPOS}; do echo "   👉 Repository: ${repo}"; done
+    while IFS=',' read -r repo_name repo_loc; do
+        [ -z "${repo_name}" ] && continue
+        echo "   👉 Repository: ${repo_name} (location: ${repo_loc})"
+    done <<< "${REPOS_INFO}"
     echo "🗑️ 削除処理を実行します..."
-    for repo in ${REPOS}; do
-        REPO_NAME="$(echo "${repo}" | awk -F'/' '{print $NF}')"
-        REPO_LOC="$(echo "${repo}" | awk -F'/' '{print $4}')"
-        gcloud artifacts repositories delete "${REPO_NAME}" --location="${REPO_LOC}" --project="${PROJECT_ID}" --quiet </dev/null 2>/dev/null || true
-    done
+    while IFS=',' read -r repo_name repo_loc; do
+        [ -z "${repo_name}" ] && continue
+        gcloud artifacts repositories delete "${repo_name}" --location="${repo_loc}" --project="${PROJECT_ID}" --quiet </dev/null 2>/dev/null || true
+    done <<< "${REPOS_INFO}"
     echo "🔄 削除完了の同期検証を行っています..."
     retry=0
     while [ ${retry} -lt 15 ]; do
