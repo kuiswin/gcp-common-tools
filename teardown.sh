@@ -178,7 +178,7 @@ cleanup_resource "6" "${TOTAL}" "Cloud Bigtable インスタンス" \
 
 # 1-7. Artifact Registry
 echo "🔎 【7/${TOTAL}】Artifact Registry リポジトリ のチェックを行っています..."
-REPOS_INFO="$(gcloud artifacts repositories list --project="${PROJECT_ID}" --format="csv[no-heading](name,location)" </dev/null 2>/dev/null || echo "")"
+REPOS_INFO="$(gcloud artifacts repositories list --project="${PROJECT_ID}" --format="csv[no-heading](REPOSITORY,LOCATION)" </dev/null 2>/dev/null || echo "")"
 if [ -n "${REPOS_INFO}" ]; then
     echo "⚠️ 以下の残存リソースを検出しました:"
     while IFS=',' read -r repo_name repo_loc; do
