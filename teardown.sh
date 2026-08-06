@@ -100,15 +100,15 @@ TOTAL=${#RESOURCE_TARGETS[@]}
 
 # 1-1. Cloud Run (サービス / ジョブ)
 cleanup_resource "1" "${TOTAL}" "Cloud Run サービス" \
-    "gcloud run services list --project=\"${PROJECT_ID}\" --region=us-central1 --format=\"value(metadata.name)\"" \
+    "gcloud run services list --project=\"${PROJECT_ID}\" --format=\"value(metadata.name)\"" \
     "gcloud run services delete" \
-    "--project=\"${PROJECT_ID}\" --quiet --region=us-central1" \
+    "--project=\"${PROJECT_ID}\" --quiet --region=asia-northeast1" \
     "Cloud Run サービス"
 
 cleanup_resource "1b" "${TOTAL}" "Cloud Run ジョブ" \
-    "gcloud run jobs list --project=\"${PROJECT_ID}\" --region=us-central1 --format=\"value(metadata.name)\"" \
+    "gcloud run jobs list --project=\"${PROJECT_ID}\" --format=\"value(metadata.name)\"" \
     "gcloud run jobs delete" \
-    "--project=\"${PROJECT_ID}\" --quiet --region=us-central1" \
+    "--project=\"${PROJECT_ID}\" --quiet --region=asia-northeast1" \
     "Cloud Run ジョブ"
 
 # 1-2. Pub/Sub
@@ -149,9 +149,9 @@ cleanup_resource "4" "${TOTAL}" "Cloud Spanner インスタンス" \
 
 # 1-5. AlloyDB
 cleanup_resource "5" "${TOTAL}" "AlloyDB クラスター" \
-    "gcloud alloydb clusters list --project=\"${PROJECT_ID}\" --region=us-central1 --format=\"value(name)\"" \
+    "gcloud alloydb clusters list --project=\"${PROJECT_ID}\" --region=asia-northeast1 --format=\"value(name)\"" \
     "gcloud alloydb clusters delete" \
-    "--project=\"${PROJECT_ID}\" --region=us-central1 --force --quiet" \
+    "--project=\"${PROJECT_ID}\" --region=asia-northeast1 --force --quiet" \
     "AlloyDB クラスター"
 
 # 1-6. Cloud Bigtable
@@ -173,7 +173,13 @@ if [ -n "${REPOS}" ]; then
         REPO_LOC="$(echo "${repo}" | awk -F'/' '{print $4}')"
         gcloud artifacts repositories delete "${REPO_NAME}" --location="${REPO_LOC}" --project="${PROJECT_ID}" --quiet </dev/null 2>/dev/null || true
     done
-    echo "✅ 削除処理を完了しました！（Artifact Registry）"
+    echo "🔄 削除後の再確認を行っています..."
+    CHECK_REPOS="$(gcloud artifacts repositories list --project="${PROJECT_ID}" --format="value(name)" </dev/null 2>/dev/null || echo "")"
+    if [ -z "${CHECK_REPOS}" ]; then
+        echo "✅ 削除完了を確認しました！（Artifact Registry: 0件）"
+    else
+        echo "⚠️ 削除処理を実行しました（残存 ${CHECK_REPOS} のパージをバックグラウンド完了待ち）"
+    fi
 else
     echo "ℹ️ Artifact Registry リポジトリ は検出されませんでした（すでにクリーンです）"
 fi
@@ -188,9 +194,9 @@ cleanup_resource "8" "${TOTAL}" "Secret Manager シークレット" \
 
 # 1-9. Vertex AI Endpoints
 cleanup_resource "9" "${TOTAL}" "Vertex AI 常駐エンドポイント" \
-    "gcloud ai endpoints list --project=\"${PROJECT_ID}\" --region=us-central1 --format=\"value(name)\"" \
+    "gcloud ai endpoints list --project=\"${PROJECT_ID}\" --region=asia-northeast1 --format=\"value(name)\"" \
     "gcloud ai endpoints delete" \
-    "--project=\"${PROJECT_ID}\" --region=us-central1 --quiet" \
+    "--project=\"${PROJECT_ID}\" --region=asia-northeast1 --quiet" \
     "Vertex AI エンドポイント"
 
 # 1-10. IAM Service Accounts
