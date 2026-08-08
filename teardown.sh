@@ -296,7 +296,7 @@ echo "🔍 2. 有効なAPIサービスのチェック ＆ 無効化"
 echo "--------------------------------------------------------"
 
 # 基本APIホワイトリストパターン (grep -E 用)
-WHITELIST_REGEX="cloudresourcemanager.googleapis.com|serviceusage.googleapis.com|cloudbilling.googleapis.com|cloudaicompanion.googleapis.com|iam.googleapis.com|iamcredentials.googleapis.com|logging.googleapis.com|compute.googleapis.com|oslogin.googleapis.com|storage.googleapis.com|spanner.googleapis.com|secretmanager.googleapis.com|telemetry.googleapis.com|storage-api.googleapis.com|storage-component.googleapis.com"
+WHITELIST_REGEX="cloudresourcemanager\.googleapis\.com|serviceusage\.googleapis\.com|cloudbilling\.googleapis\.com|cloudaicompanion\.googleapis\.com|iam\.googleapis\.com|iamcredentials\.googleapis\.com|logging\.googleapis\.com|compute\.googleapis\.com|oslogin\.googleapis\.com|storage\.googleapis\.com|spanner\.googleapis\.com|secretmanager\.googleapis\.com|telemetry\.googleapis\.com|storage-api\.googleapis\.com|storage-component\.googleapis\.com"
 
 echo "📌 【定義】プロジェクト維持のため「残して良い基本API (ホワイトリスト)」:"
 echo "   🟢 cloudbilling.googleapis.com (Cloud Billing API)"
@@ -310,7 +310,7 @@ ENABLED_APIS="$(gcloud services list --enabled --project="${PROJECT_ID}" --forma
 
 TARGET_APIS=""
 if [ -n "${ENABLED_APIS}" ]; then
-    TARGET_APIS="$(echo "${ENABLED_APIS}" | grep -v -E "${WHITELIST_REGEX}" || true)"
+    TARGET_APIS="$(echo "${ENABLED_APIS}" | tr ' ' '\n' | grep -v -E "^(${WHITELIST_REGEX})$" || true)"
 fi
 
 if [ -n "${TARGET_APIS}" ]; then
@@ -333,12 +333,12 @@ echo "🔎 【切り分け判定】無効化後の残存APIチェック中..."
 FINAL_APIS="$(gcloud services list --enabled --project="${PROJECT_ID}" --format="value(config.name)" </dev/null 2>/dev/null || echo "")"
 FINAL_TARGETS=""
 if [ -n "${FINAL_APIS}" ]; then
-    FINAL_TARGETS="$(echo "${FINAL_APIS}" | grep -v -E "${WHITELIST_REGEX}" || true)"
+    FINAL_TARGETS="$(echo "${FINAL_APIS}" | tr ' ' '\n' | grep -v -E "^(${WHITELIST_REGEX})$" || true)"
 fi
 
 TOTAL_FINAL_COUNT=0
 if [ -n "${FINAL_APIS}" ]; then
-    TOTAL_FINAL_COUNT=$(echo "${FINAL_APIS}" | wc -w)
+    TOTAL_FINAL_COUNT=$(echo "${FINAL_APIS}" | tr ' ' '\n' | wc -l)
 fi
 
 if [ -z "${FINAL_TARGETS}" ]; then
@@ -346,7 +346,7 @@ if [ -z "${FINAL_TARGETS}" ]; then
     echo ""
     echo "📌 最終的にプロジェクトに残っているAPI一覧 (${TOTAL_FINAL_COUNT}件 / 想定内):"
 else
-    EXTRA_COUNT=$(echo "${FINAL_TARGETS}" | wc -w)
+    EXTRA_COUNT=$(echo "${FINAL_TARGETS}" | tr ' ' '\n' | wc -l)
     echo "🚨 【要確認】基本API以外に、以下の未停止API（${EXTRA_COUNT}件）が残存しています！"
     for api in ${FINAL_TARGETS}; do
         echo "   🔴 停止未完了API: ${api}"
@@ -381,8 +381,18 @@ if [ -n "${FINAL_APIS}" ]; then
             "logging.googleapis.com")
                 echo "   🟢 [維持OK] ${api} (Cloud Logging API)"
                 ;;
+            "compute.googleapis.com")
+                echo "   🟢 [維持OK] ${api} (Compute Engine API - インフラ基盤)"
+                ;;
+            "oslogin.googleapis.com")
+                echo "   🟢 [維持OK] ${api} (OS Login API - インフラ基盤)"
+                ;;
             *)
-                echo "   🔴 [要確認] ${api}"
+                if echo "${api}" | grep -q -E "^(${WHITELIST_REGEX})$"; then
+                    echo "   🟢 [維持OK] ${api} (基本インフラAPI)"
+                else
+                    echo "   🔴 [要確認] ${api}"
+                fi
                 ;;
         esac
     done
