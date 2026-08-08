@@ -1,11 +1,12 @@
 #!/bin/bash
 set -eu
 
-# -----------------------------------------------------------------------------
-# GCP 全サービス一括クリーンアップ ＆ 休眠（課金解除）データ駆動型スクリプト
-# -----------------------------------------------------------------------------
+export CLOUDSDK_CORE_DISABLE_PROMPTS=1
 
 PROJECT_ID="${PROJECT_ID:-$(gcloud config get-value project </dev/null 2>/dev/null || echo "")}"
+if [ -z "${PROJECT_ID}" ] && [ -f ~/.config/gcloud/configurations/config_default ]; then
+    PROJECT_ID="$(grep '^project =' ~/.config/gcloud/configurations/config_default | cut -d'=' -f2 | tr -d ' ' || true)"
+fi
 
 if [ -z "${PROJECT_ID}" ]; then
     echo "❌ PROJECT_ID が指定されておらず、アクティブなプロジェクトも確認できません。"
@@ -23,7 +24,8 @@ echo ""
 # 1. 走査・お掃除対象サービス一覧の定義 (データリスト)
 # -----------------------------------------------------------------------------
 RESOURCE_TARGETS=(
-    "Cloud Run (サービス / ジョブ)"
+    "Cloud Run サービス"
+    "Cloud Run ジョブ"
     "Pub/Sub (トピック / サブスクリプション)"
     "Cloud Storage (GCS バケット)"
     "Cloud Spanner (データベースインスタンス)"
@@ -114,14 +116,14 @@ cleanup_resource "1" "${TOTAL}" "Cloud Run サービス" \
     "--project=\"${PROJECT_ID}\" --quiet --region=asia-northeast1" \
     "Cloud Run サービス"
 
-cleanup_resource "1b" "${TOTAL}" "Cloud Run ジョブ" \
+cleanup_resource "2" "${TOTAL}" "Cloud Run ジョブ" \
     "gcloud run jobs list --project=\"${PROJECT_ID}\" --format=\"value(metadata.name)\"" \
     "gcloud run jobs delete" \
     "--project=\"${PROJECT_ID}\" --quiet --region=asia-northeast1" \
     "Cloud Run ジョブ"
 
 # 1-2. Pub/Sub
-echo "🔎 【2/${TOTAL}】Pub/Sub (トピック・サブスクリプション) のチェックを行っています..."
+echo "🔎 【3/${TOTAL}】Pub/Sub (トピック・サブスクリプション) のチェックを行っています..."
 SUBS="$(gcloud pubsub subscriptions list --project="${PROJECT_ID}" --format="value(name)" </dev/null 2>/dev/null || echo "")"
 TOPICS="$(gcloud pubsub topics list --project="${PROJECT_ID}" --format="value(name)" </dev/null 2>/dev/null || echo "")"
 if [ -n "${SUBS}" ] || [ -n "${TOPICS}" ]; then
@@ -149,35 +151,35 @@ fi
 echo ""
 
 # 1-3. Cloud Storage (GCS)
-cleanup_resource "3" "${TOTAL}" "Cloud Storage (GCS バケット)" \
+cleanup_resource "4" "${TOTAL}" "Cloud Storage (GCS バケット)" \
     "gcloud storage ls --project=\"${PROJECT_ID}\"" \
     "gcloud storage rm -r" \
     "--quiet" \
     "GCS バケット"
 
 # 1-4. Cloud Spanner
-cleanup_resource "4" "${TOTAL}" "Cloud Spanner インスタンス" \
+cleanup_resource "5" "${TOTAL}" "Cloud Spanner インスタンス" \
     "gcloud spanner instances list --project=\"${PROJECT_ID}\" --format=\"value(name)\"" \
     "gcloud spanner instances delete" \
     "--project=\"${PROJECT_ID}\" --quiet" \
     "Spanner インスタンス"
 
 # 1-5. AlloyDB
-cleanup_resource "5" "${TOTAL}" "AlloyDB クラスター" \
+cleanup_resource "6" "${TOTAL}" "AlloyDB クラスター" \
     "gcloud alloydb clusters list --project=\"${PROJECT_ID}\" --region=asia-northeast1 --format=\"value(name)\"" \
     "gcloud alloydb clusters delete" \
     "--project=\"${PROJECT_ID}\" --region=asia-northeast1 --force --quiet" \
     "AlloyDB クラスター"
 
 # 1-6. Cloud Bigtable
-cleanup_resource "6" "${TOTAL}" "Cloud Bigtable インスタンス" \
+cleanup_resource "7" "${TOTAL}" "Cloud Bigtable インスタンス" \
     "gcloud bigtable instances list --project=\"${PROJECT_ID}\" --format=\"value(name)\"" \
     "gcloud bigtable instances delete" \
     "--project=\"${PROJECT_ID}\" --quiet" \
     "Bigtable インスタンス"
 
 # 1-7. Artifact Registry
-echo "🔎 【7/${TOTAL}】Artifact Registry リポジトリ のチェックを行っています..."
+echo "🔎 【8/${TOTAL}】Artifact Registry リポジトリ のチェックを行っています..."
 REPOS_INFO="$(gcloud artifacts repositories list --project="${PROJECT_ID}" --format="csv[no-heading](REPOSITORY,LOCATION)" </dev/null 2>/dev/null || echo "")"
 if [ -n "${REPOS_INFO}" ]; then
     echo "⚠️ 以下の残存リソースを検出しました:"
@@ -207,21 +209,21 @@ fi
 echo ""
 
 # 1-8. Secret Manager
-cleanup_resource "8" "${TOTAL}" "Secret Manager シークレット" \
+cleanup_resource "9" "${TOTAL}" "Secret Manager シークレット" \
     "gcloud secrets list --project=\"${PROJECT_ID}\" --format=\"value(name)\"" \
     "gcloud secrets delete" \
     "--project=\"${PROJECT_ID}\" --quiet" \
     "Secret Manager シークレット"
 
 # 1-9. Vertex AI Endpoints
-cleanup_resource "9" "${TOTAL}" "Vertex AI 常駐エンドポイント" \
+cleanup_resource "10" "${TOTAL}" "Vertex AI 常駐エンドポイント" \
     "gcloud ai endpoints list --project=\"${PROJECT_ID}\" --region=asia-northeast1 --format=\"value(name)\"" \
     "gcloud ai endpoints delete" \
     "--project=\"${PROJECT_ID}\" --region=asia-northeast1 --quiet" \
     "Vertex AI エンドポイント"
 
 # 1-10. IAM Service Accounts
-echo "🔎 【10/${TOTAL}】IAM 専用サービスアカウントのチェックを行っています..."
+echo "🔎 【11/${TOTAL}】IAM 専用サービスアカウントのチェックを行っています..."
 SAS="$(gcloud iam service-accounts list --project="${PROJECT_ID}" --format="value(email)" </dev/null 2>/dev/null || echo "")"
 TARGET_SAS=""
 if [ -n "${SAS}" ]; then
