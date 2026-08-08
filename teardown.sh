@@ -316,7 +316,10 @@ if [ -n "${TARGET_APIS}" ]; then
     echo "⚠️ 以下の不要API（無効化対象）が有効になっています:"
     for api in ${TARGET_APIS}; do echo "   👉 無効化対象API: ${api}"; done
     echo "🗑️ 不要APIの無効化処理を実行します..."
-    gcloud services disable ${TARGET_APIS} --project="${PROJECT_ID}" --force --quiet </dev/null 2>/dev/null || true
+    gcloud compute networks peerings delete servicenetworking-googleapis-com --network=default --project="${PROJECT_ID}" --quiet </dev/null 2>/dev/null || true
+    for api in ${TARGET_APIS}; do
+        gcloud services disable "${api}" --project="${PROJECT_ID}" --force --quiet </dev/null 2>/dev/null || true
+    done
     echo "🔄 API無効化処理の反映を待っています (3秒)..."
     sleep 3
 else
