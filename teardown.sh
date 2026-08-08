@@ -295,8 +295,8 @@ echo "--------------------------------------------------------"
 echo "🔍 2. 有効なAPIサービスのチェック ＆ 無効化"
 echo "--------------------------------------------------------"
 
-# 基本APIホワイトリストパターン (grep -E 用)
-WHITELIST_REGEX="cloudresourcemanager\.googleapis\.com|serviceusage\.googleapis\.com|cloudbilling\.googleapis\.com|cloudaicompanion\.googleapis\.com|iam\.googleapis\.com|iamcredentials\.googleapis\.com|logging\.googleapis\.com|compute\.googleapis\.com|oslogin\.googleapis\.com|storage\.googleapis\.com|spanner\.googleapis\.com|secretmanager\.googleapis\.com|telemetry\.googleapis\.com|storage-api\.googleapis\.com|storage-component\.googleapis\.com"
+# 基本APIホワイトリストパターン (grep -E 用) ※GCPインフラ基盤の9個のみ
+WHITELIST_REGEX="cloudresourcemanager\.googleapis\.com|serviceusage\.googleapis\.com|cloudbilling\.googleapis\.com|cloudaicompanion\.googleapis\.com|iam\.googleapis\.com|iamcredentials\.googleapis\.com|logging\.googleapis\.com|compute\.googleapis\.com|oslogin\.googleapis\.com"
 
 echo "📌 【定義】プロジェクト維持のため「残して良い基本API (ホワイトリスト)」:"
 echo "   🟢 cloudbilling.googleapis.com (Cloud Billing API)"
