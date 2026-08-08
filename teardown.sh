@@ -27,7 +27,7 @@ RAW_IS_ENABLED="$(gcloud beta billing projects describe "${PROJECT_ID}" --format
 IS_ENABLED="$(echo "${RAW_IS_ENABLED}" | tr '[:upper:]' '[:lower:]')"
 
 if [ "${IS_ENABLED}" != "true" ]; then
-    BILLING_ACCT="$(gcloud beta billing accounts list --format="value(name)" </dev/null 2>/dev/null | head -n1 || echo "")"
+    BILLING_ACCT="$(gcloud beta billing accounts list --filter="open=true" --format="value(name)" </dev/null 2>/dev/null | head -n1 || echo "")"
     if [ -n "${BILLING_ACCT}" ]; then
         echo "💡 残存リソース完全消去 ＆ 不要API無効化のため、請求先アカウントを一時的に再有効化します..."
         gcloud beta billing projects link "${PROJECT_ID}" --billing-account="${BILLING_ACCT}" --quiet </dev/null 2>/dev/null || true
@@ -115,6 +115,8 @@ for i in "${!RESOURCE_TARGETS[@]}"; do
     echo "   $((i+1)). ${RESOURCE_TARGETS[$i]}"
 done
 echo "--------------------------------------------------------"
+echo "💡 (※削除漏れ防止とAPI停止処理を100%成功させるため、走査・お掃除中のみ一時的に請求先アカウントを有効化して完全チェックを行っています)"
+
 # 削除走査用APIの有効化（API停止状態による検出漏れ・削除漏れ防止）
 gcloud services enable \
     run.googleapis.com \
@@ -294,7 +296,7 @@ echo "🔍 2. 有効なAPIサービスのチェック ＆ 無効化"
 echo "--------------------------------------------------------"
 
 # 基本APIホワイトリストパターン (grep -E 用)
-WHITELIST_REGEX="cloudresourcemanager.googleapis.com|serviceusage.googleapis.com|cloudbilling.googleapis.com|cloudaicompanion.googleapis.com|iam.googleapis.com|iamcredentials.googleapis.com|logging.googleapis.com"
+WHITELIST_REGEX="cloudresourcemanager.googleapis.com|serviceusage.googleapis.com|cloudbilling.googleapis.com|cloudaicompanion.googleapis.com|iam.googleapis.com|iamcredentials.googleapis.com|logging.googleapis.com|compute.googleapis.com|oslogin.googleapis.com|storage.googleapis.com|spanner.googleapis.com|secretmanager.googleapis.com|telemetry.googleapis.com|storage-api.googleapis.com|storage-component.googleapis.com"
 
 echo "📌 【定義】プロジェクト維持のため「残して良い基本API (ホワイトリスト)」:"
 echo "   🟢 cloudbilling.googleapis.com (Cloud Billing API)"
