@@ -21,6 +21,21 @@ echo "========================================================"
 echo ""
 
 # -----------------------------------------------------------------------------
+# 0. API停止・リソース削除のための課金一時再リンク判定 (安全な完全停止用フォールバック)
+# -----------------------------------------------------------------------------
+RAW_IS_ENABLED="$(gcloud beta billing projects describe "${PROJECT_ID}" --format="value(billingEnabled)" </dev/null 2>/dev/null || echo "false")"
+IS_ENABLED="$(echo "${RAW_IS_ENABLED}" | tr '[:upper:]' '[:lower:]')"
+
+if [ "${IS_ENABLED}" != "true" ]; then
+    BILLING_ACCT="$(gcloud beta billing accounts list --format="value(name)" </dev/null 2>/dev/null | head -n1 || echo "")"
+    if [ -n "${BILLING_ACCT}" ]; then
+        echo "💡 残存リソース完全消去 ＆ 不要API無効化のため、請求先アカウントを一時的に再有効化します..."
+        gcloud beta billing projects link "${PROJECT_ID}" --billing-account="${BILLING_ACCT}" --quiet </dev/null 2>/dev/null || true
+        sleep 2
+    fi
+fi
+
+# -----------------------------------------------------------------------------
 # 1. 走査・お掃除対象サービス一覧の定義 (データリスト)
 # -----------------------------------------------------------------------------
 RESOURCE_TARGETS=(
@@ -64,7 +79,14 @@ cleanup_resource() {
         done
         echo "🔄 削除完了の同期検証を行っています..."
         local retry=0
-        while [ ${retry} -lt 15 ]; do
+        local max_retry=15
+        local sleep_sec=2
+        # AlloyDBなどの長周期削除リソース用タイムアウト拡張 (最大5分)
+        if [[ "${label_name}" == *"AlloyDB"* || "${label_name}" == *"Spanner"* ]]; then
+            max_retry=60
+            sleep_sec=5
+        fi
+        while [ ${retry} -lt ${max_retry} ]; do
             local check_items
             check_items="$(eval "${list_cmd}" </dev/null 2>/dev/null || echo "")"
             if [ -z "${check_items}" ]; then
@@ -72,7 +94,7 @@ cleanup_resource() {
                 echo ""
                 return 0
             fi
-            sleep 2
+            sleep ${sleep_sec}
             retry=$((retry + 1))
         done
         echo "⚠️ 削除要求発行済み（バックグラウンド完全反映待ち）"
@@ -104,6 +126,8 @@ gcloud services enable \
     artifactregistry.googleapis.com \
     secretmanager.googleapis.com \
     aiplatform.googleapis.com \
+    compute.googleapis.com \
+    servicenetworking.googleapis.com \
     --project="${PROJECT_ID}" --quiet </dev/null 2>/dev/null || true
 sleep 2
 
