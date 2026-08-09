@@ -63,16 +63,16 @@ echo ""
 echo "----------------------------------------"
 echo "🔍 0. 利用可能な有効請求先アカウント一覧"
 echo "----------------------------------------"
-gcloud beta billing accounts list --filter="open=true" --quiet </dev/null 2>/dev/null || true
+gcloud billing accounts list --filter="open=true" --quiet </dev/null 2>/dev/null || true
 
-BILLING_ACCOUNT=$(gcloud beta billing accounts list --filter="open=true AND displayName ~ '${KEYWORD}'" --format="value(name)" --limit=1 --quiet </dev/null 2>/dev/null || true)
+BILLING_ACCOUNT=$(gcloud billing accounts list --filter="open=true AND displayName ~ '${KEYWORD}'" --format="value(name)" --limit=1 --quiet </dev/null 2>/dev/null || true)
 if [ -z "${BILLING_ACCOUNT}" ]; then
-    BILLING_ACCOUNT=$(gcloud beta billing accounts list --filter="open=true" --format="value(name)" --limit=1 --quiet </dev/null 2>/dev/null || true)
+    BILLING_ACCOUNT=$(gcloud billing accounts list --filter="open=true" --format="value(name)" --limit=1 --quiet </dev/null 2>/dev/null || true)
 fi
 
 BILLING_ACCOUNT_NAME=""
 if [ -n "${BILLING_ACCOUNT}" ]; then
-    BILLING_ACCOUNT_NAME=$(gcloud beta billing accounts list --filter="name:${BILLING_ACCOUNT}" --format="value(displayName)" --limit=1 --quiet </dev/null 2>/dev/null || true)
+    BILLING_ACCOUNT_NAME=$(gcloud billing accounts list --filter="name:${BILLING_ACCOUNT}" --format="value(displayName)" --limit=1 --quiet </dev/null 2>/dev/null || true)
 fi
 
 echo ""
@@ -90,7 +90,7 @@ echo ""
 echo "----------------------------------------"
 echo "🔍 2. 課金状態の確認（Link前）"
 echo "----------------------------------------"
-RAW_ENABLED="$(gcloud beta billing projects describe "${PROJECT_ID}" --format="value(billingEnabled)" </dev/null 2>/dev/null || echo "false")"
+RAW_ENABLED="$(gcloud billing projects describe "${PROJECT_ID}" --format="value(billingEnabled)" </dev/null 2>/dev/null || echo "false")"
 IS_ENABLED="$(echo "${RAW_ENABLED}" | tr '[:upper:]' '[:lower:]')"
 
 if [ "${IS_ENABLED}" = "true" ]; then
@@ -146,7 +146,7 @@ echo "----------------------------------------"
 echo "⚡ 4. 請求先アカウントの有効化（Link）"
 echo "----------------------------------------"
 if [ -n "${BILLING_ACCOUNT}" ]; then
-    gcloud beta billing projects link "${PROJECT_ID}" --billing-account="${BILLING_ACCOUNT}" --quiet </dev/null 2>/dev/null || true
+    gcloud billing projects link "${PROJECT_ID}" --billing-account="${BILLING_ACCOUNT}" --quiet </dev/null 2>/dev/null || true
     echo "🔄 紐付け処理の反映を待っています (2秒)..."
     sleep 2
 else
@@ -157,7 +157,7 @@ echo ""
 echo "----------------------------------------"
 echo "🔍 5. 課金状態の最終確認（Link後）"
 echo "----------------------------------------"
-RAW_AFTER="$(gcloud beta billing projects describe "${PROJECT_ID}" --format="value(billingEnabled)" </dev/null 2>/dev/null || echo "false")"
+RAW_AFTER="$(gcloud billing projects describe "${PROJECT_ID}" --format="value(billingEnabled)" </dev/null 2>/dev/null || echo "false")"
 AFTER_ENABLED="$(echo "${RAW_AFTER}" | tr '[:upper:]' '[:lower:]')"
 
 if [ "${AFTER_ENABLED}" = "true" ]; then

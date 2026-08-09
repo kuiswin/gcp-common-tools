@@ -23,14 +23,14 @@ echo ""
 # -----------------------------------------------------------------------------
 # 0. API停止・リソース削除のための課金一時再リンク判定 (安全な完全停止用フォールバック)
 # -----------------------------------------------------------------------------
-RAW_IS_ENABLED="$(gcloud beta billing projects describe "${PROJECT_ID}" --format="value(billingEnabled)" </dev/null 2>/dev/null || echo "false")"
+RAW_IS_ENABLED="$(gcloud billing projects describe "${PROJECT_ID}" --format="value(billingEnabled)" </dev/null 2>/dev/null || echo "false")"
 IS_ENABLED="$(echo "${RAW_IS_ENABLED}" | tr '[:upper:]' '[:lower:]')"
 
 if [ "${IS_ENABLED}" != "true" ]; then
-    BILLING_ACCT="$(gcloud beta billing accounts list --filter="open=true" --format="value(name)" </dev/null 2>/dev/null | head -n1 || echo "")"
+    BILLING_ACCT="$(gcloud billing accounts list --filter="open=true" --format="value(name)" </dev/null 2>/dev/null | head -n1 || echo "")"
     if [ -n "${BILLING_ACCT}" ]; then
         echo "💡 残存リソース完全消去 ＆ 不要API無効化のため、請求先アカウントを一時的に再有効化します..."
-        gcloud beta billing projects link "${PROJECT_ID}" --billing-account="${BILLING_ACCT}" --quiet </dev/null 2>/dev/null || true
+        gcloud billing projects link "${PROJECT_ID}" --billing-account="${BILLING_ACCT}" --quiet </dev/null 2>/dev/null || true
         sleep 2
     fi
 fi
@@ -407,7 +407,7 @@ echo "🔍 3. 請求先アカウントのチェック ＆ 解除 (Unlink)"
 echo "--------------------------------------------------------"
 echo "🔎 現在の課金紐付け状態をチェックしています..."
 
-RAW_IS_ENABLED="$(gcloud beta billing projects describe "${PROJECT_ID}" --format="value(billingEnabled)" </dev/null 2>/dev/null || echo "false")"
+RAW_IS_ENABLED="$(gcloud billing projects describe "${PROJECT_ID}" --format="value(billingEnabled)" </dev/null 2>/dev/null || echo "false")"
 IS_ENABLED="$(echo "${RAW_IS_ENABLED}" | tr '[:upper:]' '[:lower:]')"
 
 if [ "${IS_ENABLED}" = "true" ]; then
@@ -415,7 +415,7 @@ if [ "${IS_ENABLED}" = "true" ]; then
     echo "⚡ 請求先アカウントの解除（Unlink）を実行します..."
     gcloud billing projects unlink "${PROJECT_ID}" --quiet </dev/null 2>/dev/null || true
     echo "🔄 解除後の課金状態を再確認中..."
-    RAW_AFTER="$(gcloud beta billing projects describe "${PROJECT_ID}" --format="value(billingEnabled)" </dev/null 2>/dev/null || echo "false")"
+    RAW_AFTER="$(gcloud billing projects describe "${PROJECT_ID}" --format="value(billingEnabled)" </dev/null 2>/dev/null || echo "false")"
     AFTER_ENABLED="$(echo "${RAW_AFTER}" | tr '[:upper:]' '[:lower:]')"
     if [ "${AFTER_ENABLED}" = "false" ]; then
         echo "✅ 【解除成功】課金アカウントの解除が完了しました！（課金OFF: false）"
