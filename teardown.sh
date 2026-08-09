@@ -43,6 +43,7 @@ RESOURCE_TARGETS=(
     "Cloud Run ジョブ"
     "Pub/Sub (トピック / サブスクリプション)"
     "Cloud Storage (GCS バケット)"
+    "BigQuery (データセット)"
     "Cloud Spanner (データベースインスタンス)"
     "AlloyDB (データベースクラスター)"
     "Cloud Bigtable (NoSQLデータベースインスタンス)"
@@ -122,6 +123,7 @@ gcloud services enable \
     run.googleapis.com \
     pubsub.googleapis.com \
     storage.googleapis.com \
+    bigquery.googleapis.com \
     spanner.googleapis.com \
     alloydb.googleapis.com \
     bigtable.googleapis.com \
@@ -183,29 +185,36 @@ cleanup_resource "4" "${TOTAL}" "Cloud Storage (GCS バケット)" \
     "--quiet" \
     "GCS バケット"
 
-# 1-4. Cloud Spanner
-cleanup_resource "5" "${TOTAL}" "Cloud Spanner インスタンス" \
+# 1-4. BigQuery Dataset
+cleanup_resource "5" "${TOTAL}" "BigQuery データセット" \
+    "bq ls --project_id=\"${PROJECT_ID}\" --format=sparse 2>/dev/null | awk 'NR>2 {print \$1}'" \
+    "bq rm -r -f -d" \
+    "--project_id=\"${PROJECT_ID}\"" \
+    "BigQuery データセット"
+
+# 1-5. Cloud Spanner
+cleanup_resource "6" "${TOTAL}" "Cloud Spanner インスタンス" \
     "gcloud spanner instances list --project=\"${PROJECT_ID}\" --format=\"value(name)\"" \
     "gcloud spanner instances delete" \
     "--project=\"${PROJECT_ID}\" --quiet" \
     "Spanner インスタンス"
 
-# 1-5. AlloyDB
-cleanup_resource "6" "${TOTAL}" "AlloyDB クラスター" \
+# 1-6. AlloyDB
+cleanup_resource "7" "${TOTAL}" "AlloyDB クラスター" \
     "gcloud alloydb clusters list --project=\"${PROJECT_ID}\" --region=asia-northeast1 --format=\"value(name)\"" \
     "gcloud alloydb clusters delete" \
     "--project=\"${PROJECT_ID}\" --region=asia-northeast1 --force --quiet" \
     "AlloyDB クラスター"
 
-# 1-6. Cloud Bigtable
-cleanup_resource "7" "${TOTAL}" "Cloud Bigtable インスタンス" \
+# 1-7. Cloud Bigtable
+cleanup_resource "8" "${TOTAL}" "Cloud Bigtable インスタンス" \
     "gcloud bigtable instances list --project=\"${PROJECT_ID}\" --format=\"value(name)\"" \
     "gcloud bigtable instances delete" \
     "--project=\"${PROJECT_ID}\" --quiet" \
     "Bigtable インスタンス"
 
-# 1-7. Artifact Registry
-echo "🔎 【8/${TOTAL}】Artifact Registry リポジトリ のチェックを行っています..."
+# 1-8. Artifact Registry
+echo "🔎 【9/${TOTAL}】Artifact Registry リポジトリ のチェックを行っています..."
 REPOS_INFO="$(gcloud artifacts repositories list --project="${PROJECT_ID}" --format="csv[no-heading](REPOSITORY,LOCATION)" </dev/null 2>/dev/null || echo "")"
 if [ -n "${REPOS_INFO}" ]; then
     echo "⚠️ 以下の残存リソースを検出しました:"
@@ -234,22 +243,22 @@ else
 fi
 echo ""
 
-# 1-8. Secret Manager
-cleanup_resource "9" "${TOTAL}" "Secret Manager シークレット" \
+# 1-9. Secret Manager
+cleanup_resource "10" "${TOTAL}" "Secret Manager シークレット" \
     "gcloud secrets list --project=\"${PROJECT_ID}\" --format=\"value(name)\"" \
     "gcloud secrets delete" \
     "--project=\"${PROJECT_ID}\" --quiet" \
     "Secret Manager シークレット"
 
-# 1-9. Vertex AI Endpoints
-cleanup_resource "10" "${TOTAL}" "Vertex AI 常駐エンドポイント" \
+# 1-10. Vertex AI Endpoints
+cleanup_resource "11" "${TOTAL}" "Vertex AI 常駐エンドポイント" \
     "gcloud ai endpoints list --project=\"${PROJECT_ID}\" --region=asia-northeast1 --format=\"value(name)\"" \
     "gcloud ai endpoints delete" \
     "--project=\"${PROJECT_ID}\" --region=asia-northeast1 --quiet" \
     "Vertex AI エンドポイント"
 
-# 1-10. IAM Service Accounts
-echo "🔎 【11/${TOTAL}】IAM 専用サービスアカウントのチェックを行っています..."
+# 1-11. IAM Service Accounts
+echo "🔎 【12/${TOTAL}】IAM 専用サービスアカウントのチェックを行っています..."
 SAS="$(gcloud iam service-accounts list --project="${PROJECT_ID}" --format="value(email)" </dev/null 2>/dev/null || echo "")"
 TARGET_SAS=""
 if [ -n "${SAS}" ]; then

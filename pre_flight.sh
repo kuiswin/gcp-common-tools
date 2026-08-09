@@ -105,8 +105,18 @@ fi
 
 echo ""
 echo "----------------------------------------"
-echo "🔍 3. 有効なAPIの安全・分類チェック"
+echo "🔍 3. 基本無料システムAPIの有効化 ＆ 分類チェック"
 echo "----------------------------------------"
+echo "⚡ 基本無料基盤API（Billing, Resource Manager, Service Usage, IAM, Logging）を能動的に有効化中..."
+gcloud services enable \
+    cloudbilling.googleapis.com \
+    cloudresourcemanager.googleapis.com \
+    serviceusage.googleapis.com \
+    iam.googleapis.com \
+    iamcredentials.googleapis.com \
+    logging.googleapis.com \
+    --project="${PROJECT_ID}" --quiet </dev/null 2>/dev/null || true
+
 echo "📌 [期待される標準・無料基盤構成]:"
 echo "  - ✅ 基本システムAPI: Billing, Resource Manager, Service Usage, IAM, Cloud Logging (完全無料)"
 echo "  - ℹ️ Webコンソール自動アシスト: Gemini for Google Cloud / Gemini Cloud Assist (完全無料)"
