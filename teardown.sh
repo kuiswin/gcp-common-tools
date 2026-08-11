@@ -74,10 +74,11 @@ cleanup_resource() {
         for item in ${items}; do
             echo "   👉 ${label_name}: ${item}"
         done
-        echo "🗑️ 削除処理を実行します..."
+        echo "🗑️ 削除処理を並列実行します..."
         for item in ${items}; do
-            eval "${del_cmd_prefix} \"${item}\" ${del_cmd_suffix}" </dev/null 2>/dev/null || true
+            eval "${del_cmd_prefix} \"${item}\" ${del_cmd_suffix}" </dev/null 2>/dev/null &
         done
+        wait
         echo "🔄 削除完了の同期検証を行っています..."
         local retry=0
         local max_retry=15
@@ -132,8 +133,8 @@ gcloud services enable \
     aiplatform.googleapis.com \
     compute.googleapis.com \
     servicenetworking.googleapis.com \
-    --project="${PROJECT_ID}" --quiet </dev/null 2>/dev/null || true
-sleep 2
+    --project="${PROJECT_ID}" --async --quiet </dev/null 2>/dev/null || true
+sleep 1
 
 TOTAL=${#RESOURCE_TARGETS[@]}
 
@@ -158,9 +159,10 @@ if [ -n "${SUBS}" ] || [ -n "${TOPICS}" ]; then
     echo "⚠️ 以下の残存リソースを検出しました:"
     for sub in ${SUBS}; do echo "   👉 Subscription: ${sub}"; done
     for t in ${TOPICS}; do echo "   👉 Topic: ${t}"; done
-    echo "🗑️ 削除処理を実行します..."
-    for sub in ${SUBS}; do gcloud pubsub subscriptions delete "${sub}" --project="${PROJECT_ID}" --quiet </dev/null 2>/dev/null || true; done
-    for t in ${TOPICS}; do gcloud pubsub topics delete "${t}" --project="${PROJECT_ID}" --quiet </dev/null 2>/dev/null || true; done
+    echo "🗑️ 削除処理を並列実行します..."
+    for sub in ${SUBS}; do gcloud pubsub subscriptions delete "${sub}" --project="${PROJECT_ID}" --quiet </dev/null 2>/dev/null & done
+    for t in ${TOPICS}; do gcloud pubsub topics delete "${t}" --project="${PROJECT_ID}" --quiet </dev/null 2>/dev/null & done
+    wait
     echo "🔄 削除完了の同期検証を行っています..."
     retry=0
     while [ ${retry} -lt 15 ]; do
@@ -222,11 +224,12 @@ if [ -n "${REPOS_INFO}" ]; then
         [ -z "${repo_name}" ] && continue
         echo "   👉 Repository: ${repo_name} (location: ${repo_loc})"
     done <<< "${REPOS_INFO}"
-    echo "🗑️ 削除処理を実行します..."
+    echo "🗑️ 削除処理を並列実行します..."
     while IFS=',' read -r repo_name repo_loc; do
         [ -z "${repo_name}" ] && continue
-        gcloud artifacts repositories delete "${repo_name}" --location="${repo_loc}" --project="${PROJECT_ID}" --quiet </dev/null 2>/dev/null || true
+        gcloud artifacts repositories delete "${repo_name}" --location="${repo_loc}" --project="${PROJECT_ID}" --quiet </dev/null 2>/dev/null &
     done <<< "${REPOS_INFO}"
+    wait
     echo "🔄 削除完了の同期検証を行っています..."
     retry=0
     while [ ${retry} -lt 15 ]; do
@@ -295,8 +298,9 @@ fi
 if [ -n "${TARGET_SAS}" ]; then
     echo "⚠️ 以下の残存専用サービスアカウントを検出しました:"
     for sa in ${TARGET_SAS}; do echo "   👉 Service Account: ${sa}"; done
-    echo "🗑️ 削除処理を実行します..."
-    for sa in ${TARGET_SAS}; do gcloud iam service-accounts delete "${sa}" --project="${PROJECT_ID}" --quiet </dev/null 2>/dev/null || true; done
+    echo "🗑️ 削除処理を並列実行します..."
+    for sa in ${TARGET_SAS}; do gcloud iam service-accounts delete "${sa}" --project="${PROJECT_ID}" --quiet </dev/null 2>/dev/null & done
+    wait
     echo "🔄 削除完了の同期検証を行っています..."
     retry=0
     while [ ${retry} -lt 15 ]; do
@@ -350,25 +354,17 @@ if [ -n "${TARGET_APIS}" ]; then
     echo "💡 (※STEP 1の削除走査時に、API停止による削除漏れを100%防止するため、走査用管理APIを一時有効化して完全チェックを行っています)"
     echo "⚠️ 以下の不要API（無効化対象）が有効になっています:"
     for api in ${TARGET_APIS}; do echo "   👉 無効化対象API: ${api}"; done
-    echo "🗑️ 不要APIの無効化処理を実行します..."
-    gcloud compute networks peerings delete servicenetworking-googleapis-com --network=default --project="${PROJECT_ID}" --quiet </dev/null 2>/dev/null || true
-    for api in ${TARGET_APIS}; do
-        gcloud services disable "${api}" --project="${PROJECT_ID}" --force --quiet </dev/null 2>/dev/null || true
-    done
-    echo "🔄 不要APIが無効化され完全消去されるまで同期検証中 (最大15分 / 5秒間隔)..."
-    retry=0
-    max_retries=180
-    while [ ${retry} -lt ${max_retries} ]; do
-        if [ $((retry % 6)) -eq 0 ] && [ ${retry} -gt 0 ]; then
-            ENABLED_NOW="$(gcloud services list --enabled --project="${PROJECT_ID}" --format="value(config.name)" </dev/null 2>/dev/null || echo "")"
-            REMAINING_TARGETS="$(echo "${ENABLED_NOW}" | tr " " "\n" | grep -v -E "^(${WHITELIST_REGEX})$" || true)"
-            if [ -n "${REMAINING_TARGETS}" ]; then
-                for api in ${REMAINING_TARGETS}; do
-                    gcloud services disable "${api}" --project="${PROJECT_ID}" --force --quiet </dev/null 2>/dev/null || true
-                done
-            fi
-        fi
+    echo "🗑️ 不要APIの無効化処理を並列一括実行します..."
+    gcloud compute networks peerings delete servicenetworking-googleapis-com --network=default --project="${PROJECT_ID}" --quiet </dev/null 2>/dev/null &
+    
+    # 複数APIを一括指定 ＆ 非同期 (--async) で最速無効化要求を発行
+    gcloud services disable ${TARGET_APIS} --project="${PROJECT_ID}" --force --async --quiet </dev/null 2>/dev/null || true
+    wait
 
+    echo "🔄 不要APIが無効化され完全消去されるまで同期検証中 (非同期一括高速モード)..."
+    retry=0
+    max_retries=60
+    while [ ${retry} -lt ${max_retries} ]; do
         FINAL_APIS="$(gcloud services list --enabled --project="${PROJECT_ID}" --format="value(config.name)" </dev/null 2>/dev/null || echo "")"
         FINAL_TARGETS=""
         if [ -n "${FINAL_APIS}" ]; then
@@ -378,6 +374,16 @@ if [ -n "${TARGET_APIS}" ]; then
         if [ -z "${FINAL_TARGETS}" ]; then
             break
         fi
+
+        if [ $((retry % 3)) -eq 0 ] && [ ${retry} -gt 0 ]; then
+            # 未完了のAPIが存在する場合は一括再リトライ
+            gcloud services disable ${FINAL_TARGETS} --project="${PROJECT_ID}" --force --async --quiet </dev/null 2>/dev/null || true
+        fi
+
+        echo "   ⏳ API非活性化の反映を待機中... (${retry}/${max_retries} 回目 - 残存: $(echo ${FINAL_TARGETS} | tr "\n" " "))"
+        sleep 3
+        retry=$((retry + 1))
+    done
         echo "   ⏳ API非活性化の反映を待機中... (${retry}/${max_retries} 回目 - 残存: $(echo ${FINAL_TARGETS} | tr "\n" " "))"
         sleep 5
         retry=$((retry + 1))
