@@ -305,7 +305,7 @@ echo "🔍 2. 有効なAPIサービスのチェック ＆ 無効化"
 echo "--------------------------------------------------------"
 
 # 基本APIホワイトリストパターン (grep -E 用) ※GCPインフラ基盤の9個のみ
-WHITELIST_REGEX="cloudresourcemanager\.googleapis\.com|serviceusage\.googleapis\.com|cloudbilling\.googleapis\.com|cloudaicompanion\.googleapis\.com|iam\.googleapis\.com|iamcredentials\.googleapis\.com|logging\.googleapis\.com|compute\.googleapis\.com|oslogin\.googleapis\.com"
+WHITELIST_REGEX="cloudresourcemanager\.googleapis\.com|serviceusage\.googleapis\.com|cloudbilling\.googleapis\.com|cloudaicompanion\.googleapis\.com|iam\.googleapis\.com|iamcredentials\.googleapis\.com|logging\.googleapis\.com"
 
 echo "📌 【定義】プロジェクト維持のため「残して良い基本API (ホワイトリスト)」:"
 echo "   🟢 cloudbilling.googleapis.com (Cloud Billing API)"
@@ -331,8 +331,33 @@ if [ -n "${TARGET_APIS}" ]; then
     for api in ${TARGET_APIS}; do
         gcloud services disable "${api}" --project="${PROJECT_ID}" --force --quiet </dev/null 2>/dev/null || true
     done
-    echo "🔄 API無効化処理の反映を待っています (3秒)..."
-    sleep 3
+    echo "🔄 不要APIが無効化され完全消去されるまで同期検証中 (最大15分 / 5秒間隔)..."
+    retry=0
+    max_retries=180
+    while [ ${retry} -lt ${max_retries} ]; do
+        if [ $((retry % 6)) -eq 0 ] && [ ${retry} -gt 0 ]; then
+            ENABLED_NOW="$(gcloud services list --enabled --project="${PROJECT_ID}" --format="value(config.name)" </dev/null 2>/dev/null || echo "")"
+            REMAINING_TARGETS="$(echo "${ENABLED_NOW}" | tr " " "\n" | grep -v -E "^(${WHITELIST_REGEX})$" || true)"
+            if [ -n "${REMAINING_TARGETS}" ]; then
+                for api in ${REMAINING_TARGETS}; do
+                    gcloud services disable "${api}" --project="${PROJECT_ID}" --force --quiet </dev/null 2>/dev/null || true
+                done
+            fi
+        fi
+
+        FINAL_APIS="$(gcloud services list --enabled --project="${PROJECT_ID}" --format="value(config.name)" </dev/null 2>/dev/null || echo "")"
+        FINAL_TARGETS=""
+        if [ -n "${FINAL_APIS}" ]; then
+            FINAL_TARGETS="$(echo "${FINAL_APIS}" | tr " " "\n" | grep -v -E "^(${WHITELIST_REGEX})$" || true)"
+        fi
+
+        if [ -z "${FINAL_TARGETS}" ]; then
+            break
+        fi
+        echo "   ⏳ API非活性化の反映を待機中... (${retry}/${max_retries} 回目 - 残存: $(echo ${FINAL_TARGETS} | tr "\n" " "))"
+        sleep 5
+        retry=$((retry + 1))
+    done
 else
     echo "ℹ️ 不要なAPIは検出されませんでした（すでに最小化されています）"
 fi
