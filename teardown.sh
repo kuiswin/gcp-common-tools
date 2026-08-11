@@ -124,15 +124,8 @@ gcloud services enable \
     run.googleapis.com \
     pubsub.googleapis.com \
     storage.googleapis.com \
-    bigquery.googleapis.com \
-    spanner.googleapis.com \
-    alloydb.googleapis.com \
-    bigtable.googleapis.com \
     artifactregistry.googleapis.com \
     secretmanager.googleapis.com \
-    aiplatform.googleapis.com \
-    compute.googleapis.com \
-    servicenetworking.googleapis.com \
     --project="${PROJECT_ID}" --async --quiet </dev/null 2>/dev/null || true
 sleep 1
 
@@ -187,11 +180,11 @@ cleanup_resource "4" "${TOTAL}" "Cloud Storage (GCS バケット)" \
     "--quiet" \
     "GCS バケット"
 
-# 1-4. BigQuery Dataset
+# 1-4. BigQuery Dataset (API未有効時はスルー、データセットID正規表現フィルタ)
 cleanup_resource "5" "${TOTAL}" "BigQuery データセット" \
-    "bq ls --project_id=\"${PROJECT_ID}\" --format=sparse 2>/dev/null | awk 'NR>2 {print \$1}'" \
-    "bq rm -r -f -d" \
-    "--project_id=\"${PROJECT_ID}\"" \
+    "bq --project_id=\"${PROJECT_ID}\" ls --format=sparse 2>/dev/null | awk 'NR>2 {print \$1}' | grep -E '^[a-zA-Z0-9_]+$'" \
+    "bq --project_id=\"${PROJECT_ID}\" rm -r -f -d" \
+    "" \
     "BigQuery データセット"
 
 # 1-5. Cloud Spanner
