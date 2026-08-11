@@ -124,8 +124,15 @@ gcloud services enable \
     run.googleapis.com \
     pubsub.googleapis.com \
     storage.googleapis.com \
+    bigquery.googleapis.com \
+    spanner.googleapis.com \
+    alloydb.googleapis.com \
+    bigtable.googleapis.com \
     artifactregistry.googleapis.com \
     secretmanager.googleapis.com \
+    aiplatform.googleapis.com \
+    compute.googleapis.com \
+    servicenetworking.googleapis.com \
     --project="${PROJECT_ID}" --async --quiet </dev/null 2>/dev/null || true
 sleep 1
 
@@ -253,7 +260,7 @@ cleanup_resource "11" "${TOTAL}" "Vertex AI 常駐エンドポイント" \
     "--project=\"${PROJECT_ID}\" --region=asia-northeast1 --quiet" \
     "Vertex AI エンドポイント"
 
-# 1-12. データアクセス監査ログ設定のクリーンアップ (auditConfigs の削除)
+# 1-12. データアクセス監査ログ設定のクリーンアップ (auditConfigs の完全リセット)
 echo "🔎 【13/${TOTAL}】データアクセス監査ログ設定 (auditConfigs) のチェックを行っています..."
 IAM_POLICY="$(gcloud projects get-iam-policy "${PROJECT_ID}" --format="json" 2>/dev/null || echo "")"
 if [ -n "${IAM_POLICY}" ] && echo "${IAM_POLICY}" | grep -q "auditConfigs"; then
@@ -262,8 +269,7 @@ if [ -n "${IAM_POLICY}" ] && echo "${IAM_POLICY}" | grep -q "auditConfigs"; then
     python3 -c '
 import json, sys
 policy = json.loads(sys.argv[1])
-if "auditConfigs" in policy:
-    del policy["auditConfigs"]
+policy["auditConfigs"] = []
 with open("/tmp/clean_iam_policy.json", "w") as f:
     json.dump(policy, f)
 ' "${IAM_POLICY}" 2>/dev/null || true
