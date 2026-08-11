@@ -335,11 +335,14 @@ echo "--------------------------------------------------------"
 # 基本APIホワイトリストパターン (grep -E 用) ※GCPインフラ基盤の9個のみ
 WHITELIST_REGEX="cloudresourcemanager\.googleapis\.com|serviceusage\.googleapis\.com|cloudbilling\.googleapis\.com|cloudaicompanion\.googleapis\.com|iam\.googleapis\.com|iamcredentials\.googleapis\.com|logging\.googleapis\.com"
 
-echo "📌 【定義】プロジェクト維持のため「残して良い基本API (ホワイトリスト)」:"
+echo "📌 【定義】プロジェクト維持のため「残して良い基本API (ホワイトリスト)」(7件):"
+echo "   🟢 cloudaicompanion.googleapis.com (Gemini for Google Cloud API)"
 echo "   🟢 cloudbilling.googleapis.com (Cloud Billing API)"
 echo "   🟢 cloudresourcemanager.googleapis.com (Cloud Resource Manager API)"
+echo "   🟢 iam.googleapis.com (Identity and Access Management API)"
+echo "   🟢 iamcredentials.googleapis.com (IAM Service Account Credentials API)"
+echo "   🟢 logging.googleapis.com (Cloud Logging API)"
 echo "   🟢 serviceusage.googleapis.com (Service Usage API)"
-echo "   🟢 cloudaicompanion.googleapis.com (Gemini for Google Cloud API)"
 echo ""
 
 echo "🔎 現在有効化されているAPI一覧をチェックしています..."
