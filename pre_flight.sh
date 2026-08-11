@@ -132,7 +132,7 @@ if [ -n "${ACTUAL_APIS}" ]; then
             cloudbilling.googleapis.com|cloudresourcemanager.googleapis.com|serviceusage.googleapis.com|iam.googleapis.com|iamcredentials.googleapis.com|logging.googleapis.com)
                 echo "  ✅ [基本無料機能] ${api}"
                 ;;
-            cloudaicompanion.googleapis.com|geminicloudassist.googleapis.com)
+            cloudaicompanion.googleapis.com|geminicloudassist.googleapis.com|telemetry.googleapis.com)
                 echo "  ℹ️ [画面操作で自動ON・無料] ${api}"
                 ;;
             *)
