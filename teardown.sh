@@ -50,6 +50,7 @@ RESOURCE_TARGETS=(
     "Artifact Registry (コンテナリポジトリ)"
     "Secret Manager (シークレット・機密情報)"
     "Vertex AI (Gemini / 機械学習常駐エンドポイント)"
+    "データアクセス監査ログ設定 (auditConfigs)"
     "IAM (専用サービスアカウント)"
 )
 
@@ -261,7 +262,7 @@ cleanup_resource "11" "${TOTAL}" "Vertex AI 常駐エンドポイント" \
     "Vertex AI エンドポイント"
 
 # 1-12. データアクセス監査ログ設定のクリーンアップ (auditConfigs の完全リセット)
-echo "🔎 【13/${TOTAL}】データアクセス監査ログ設定 (auditConfigs) のチェックを行っています..."
+echo "🔎 【12/${TOTAL}】データアクセス監査ログ設定 (auditConfigs) のチェックを行っています..."
 IAM_POLICY="$(gcloud projects get-iam-policy "${PROJECT_ID}" --format="json" 2>/dev/null || echo "")"
 if [ -n "${IAM_POLICY}" ] && echo "${IAM_POLICY}" | grep -q "auditConfigs"; then
     echo "⚠️ データアクセス監査ログ設定 (auditConfigs) の残存を検出しました"
@@ -283,8 +284,8 @@ else
 fi
 echo ""
 
-# 1-11. IAM Service Accounts
-echo "🔎 【12/${TOTAL}】IAM 専用サービスアカウントのチェックを行っています..."
+# 1-13. IAM Service Accounts
+echo "🔎 【13/${TOTAL}】IAM 専用サービスアカウントのチェックを行っています..."
 SAS="$(gcloud iam service-accounts list --project="${PROJECT_ID}" --format="value(email)" </dev/null 2>/dev/null || echo "")"
 TARGET_SAS=""
 if [ -n "${SAS}" ]; then
@@ -381,10 +382,6 @@ if [ -n "${TARGET_APIS}" ]; then
 
         echo "   ⏳ API非活性化の反映を待機中... (${retry}/${max_retries} 回目 - 残存: $(echo ${FINAL_TARGETS} | tr "\n" " "))"
         sleep 3
-        retry=$((retry + 1))
-    done
-        echo "   ⏳ API非活性化の反映を待機中... (${retry}/${max_retries} 回目 - 残存: $(echo ${FINAL_TARGETS} | tr "\n" " "))"
-        sleep 5
         retry=$((retry + 1))
     done
 else
