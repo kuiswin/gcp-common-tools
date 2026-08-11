@@ -257,6 +257,30 @@ cleanup_resource "11" "${TOTAL}" "Vertex AI 常駐エンドポイント" \
     "--project=\"${PROJECT_ID}\" --region=asia-northeast1 --quiet" \
     "Vertex AI エンドポイント"
 
+# 1-12. データアクセス監査ログ設定のクリーンアップ (auditConfigs の削除)
+echo "🔎 【13/${TOTAL}】データアクセス監査ログ設定 (auditConfigs) のチェックを行っています..."
+IAM_POLICY="$(gcloud projects get-iam-policy "${PROJECT_ID}" --format="json" 2>/dev/null || echo "")"
+if [ -n "${IAM_POLICY}" ] && echo "${IAM_POLICY}" | grep -q "auditConfigs"; then
+    echo "⚠️ データアクセス監査ログ設定 (auditConfigs) の残存を検出しました"
+    echo "🗑️ 監査ログ設定を初期状態に削除・リセットしています..."
+    python3 -c '
+import json, sys
+policy = json.loads(sys.argv[1])
+if "auditConfigs" in policy:
+    del policy["auditConfigs"]
+with open("/tmp/clean_iam_policy.json", "w") as f:
+    json.dump(policy, f)
+' "${IAM_POLICY}" 2>/dev/null || true
+    if [ -f "/tmp/clean_iam_policy.json" ]; then
+        gcloud projects set-iam-policy "${PROJECT_ID}" /tmp/clean_iam_policy.json --quiet 2>/dev/null || true
+        rm -f /tmp/clean_iam_policy.json
+    fi
+    echo "✅ 監査ログ設定を初期状態にリセットしました！"
+else
+    echo "ℹ️ 監査ログ設定は検出されませんでした（すでに標準デフォルト状態です）"
+fi
+echo ""
+
 # 1-11. IAM Service Accounts
 echo "🔎 【12/${TOTAL}】IAM 専用サービスアカウントのチェックを行っています..."
 SAS="$(gcloud iam service-accounts list --project="${PROJECT_ID}" --format="value(email)" </dev/null 2>/dev/null || echo "")"
